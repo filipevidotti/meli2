@@ -27,7 +27,7 @@ try {
     $sql = "SELECT SUM(lucro) as total FROM vendas";
     $stmt = $pdo->query($sql);
     if ($stmt) {
-        $total_lucro = $stmt->fetchColumn() ?: 0; // Usar 0 se o resultado for null
+        $total_lucro = $stmt->fetchColumn() ?: 0; 
     }
 } catch (PDOException $e) {
     // Silenciar erro
@@ -60,6 +60,9 @@ include(BASE_PATH . '/includes/header_admin.php');
                         </div>
                     </div>
                 </div>
+                <div class="card-footer">
+                    <a href="<?php echo BASE_URL; ?>/admin/vendedores.php" class="text-primary">Ver Detalhes</a>
+                </div>
             </div>
         </div>
 
@@ -77,6 +80,9 @@ include(BASE_PATH . '/includes/header_admin.php');
                         </div>
                     </div>
                 </div>
+                <div class="card-footer">
+                    <a href="<?php echo BASE_URL; ?>/admin/vendas.php" class="text-success">Ver Detalhes</a>
+                </div>
             </div>
         </div>
 
@@ -93,6 +99,9 @@ include(BASE_PATH . '/includes/header_admin.php');
                             <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
                         </div>
                     </div>
+                </div>
+                <div class="card-footer">
+                    <a href="<?php echo BASE_URL; ?>/admin/relatorios.php" class="text-info">Ver Relatórios</a>
                 </div>
             </div>
         </div>
@@ -112,6 +121,7 @@ include(BASE_PATH . '/includes/header_admin.php');
                             <thead>
                                 <tr>
                                     <th>Data</th>
+                                    <th>Vendedor</th>
                                     <th>Produto</th>
                                     <th>Valor</th>
                                     <th>Lucro</th>
@@ -120,9 +130,10 @@ include(BASE_PATH . '/includes/header_admin.php');
                             <tbody>
                                 <?php
                                 try {
-                                    $sql = "SELECT v.*, vd.nome as vendedor_nome 
+                                    $sql = "SELECT v.*, u.nome as vendedor_nome 
                                             FROM vendas v
-                                            LEFT JOIN vendedores vd ON v.vendedor_id = vd.id
+                                            LEFT JOIN vendedores vend ON v.vendedor_id = vend.id
+                                            LEFT JOIN usuarios u ON vend.usuario_id = u.id
                                             ORDER BY v.data_venda DESC
                                             LIMIT 5";
                                     $vendas = fetchAll($sql);
@@ -132,16 +143,17 @@ include(BASE_PATH . '/includes/header_admin.php');
                                             $lucro_class = $venda['lucro'] >= 0 ? 'text-success' : 'text-danger';
                                             echo '<tr>';
                                             echo '<td>' . formatDate($venda['data_venda']) . '</td>';
+                                            echo '<td>' . htmlspecialchars($venda['vendedor_nome'] ?? 'N/A') . '</td>';
                                             echo '<td>' . htmlspecialchars($venda['produto']) . '</td>';
                                             echo '<td>' . formatCurrency($venda['valor_venda']) . '</td>';
                                             echo '<td class="' . $lucro_class . '">' . formatCurrency($venda['lucro']) . '</td>';
                                             echo '</tr>';
                                         }
                                     } else {
-                                        echo '<tr><td colspan="4" class="text-center">Nenhuma venda encontrada</td></tr>';
+                                        echo '<tr><td colspan="5" class="text-center">Nenhuma venda encontrada</td></tr>';
                                     }
                                 } catch (PDOException $e) {
-                                    echo '<tr><td colspan="4" class="text-center">Erro ao carregar vendas</td></tr>';
+                                    echo '<tr><td colspan="5" class="text-center">Erro ao carregar vendas: ' . $e->getMessage() . '</td></tr>';
                                 }
                                 ?>
                             </tbody>
@@ -194,7 +206,7 @@ include(BASE_PATH . '/includes/header_admin.php');
                                         echo '<tr><td colspan="3" class="text-center">Nenhum vendedor encontrado</td></tr>';
                                     }
                                 } catch (PDOException $e) {
-                                    echo '<tr><td colspan="3" class="text-center">Erro ao carregar vendedores</td></tr>';
+                                    echo '<tr><td colspan="3" class="text-center">Erro ao carregar vendedores: ' . $e->getMessage() . '</td></tr>';
                                 }
                                 ?>
                             </tbody>
@@ -213,23 +225,23 @@ include(BASE_PATH . '/includes/header_admin.php');
         <div class="card-body">
             <div class="row">
                 <div class="col-lg-3 col-md-6 mb-3">
-                    <a href="<?php echo BASE_URL; ?>/admin/adicionar_vendedor.php" class="btn btn-primary btn-block">
-                        <i class="fas fa-user-plus mr-2"></i> Novo Vendedor
+                    <a href="<?php echo BASE_URL; ?>/admin/adicionar_vendedor.php" class="btn btn-primary w-100">
+                        <i class="fas fa-user-plus me-2"></i> Novo Vendedor
                     </a>
                 </div>
                 <div class="col-lg-3 col-md-6 mb-3">
-                    <a href="<?php echo BASE_URL; ?>/admin/registrar_venda.php" class="btn btn-success btn-block">
-                        <i class="fas fa-plus-circle mr-2"></i> Registrar Venda
+                    <a href="<?php echo BASE_URL; ?>/admin/registrar_venda.php" class="btn btn-success w-100">
+                        <i class="fas fa-plus-circle me-2"></i> Registrar Venda
                     </a>
                 </div>
                 <div class="col-lg-3 col-md-6 mb-3">
-                    <a href="<?php echo BASE_URL; ?>/admin/categorias.php" class="btn btn-warning btn-block">
-                        <i class="fas fa-tags mr-2"></i> Gerenciar Categorias
+                    <a href="<?php echo BASE_URL; ?>/admin/adicionar_produto.php" class="btn btn-warning w-100">
+                        <i class="fas fa-box me-2"></i> Novo Produto
                     </a>
                 </div>
                 <div class="col-lg-3 col-md-6 mb-3">
-                    <a href="<?php echo BASE_URL; ?>/admin/relatorios.php" class="btn btn-info btn-block">
-                        <i class="fas fa-chart-bar mr-2"></i> Ver Relatórios
+                    <a href="<?php echo BASE_URL; ?>/admin/categorias.php" class="btn btn-info w-100">
+                        <i class="fas fa-tags me-2"></i> Categorias ML
                     </a>
                 </div>
             </div>

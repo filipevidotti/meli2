@@ -1,23 +1,11 @@
 <?php
-// Iniciar sessão diretamente
+// Iniciar sessão diretamente (sem incluir init.php)
 session_start();
 
-// Definições básicas
+// Configurações básicas
 $base_url = 'http://www.annemacedo.com.br/novo2';
 
-// Se já estiver logado, redirecionar
-if (isset($_SESSION['user_id'])) {
-    if (isset($_SESSION['user_type']) && $_SESSION['user_type'] === 'admin') {
-        header('Location: ' . $base_url . '/admin/index.php');
-        exit;
-    } else {
-        // Vendedor vai para a interface de vendedor
-        header('Location: ' . $base_url . '/vendedor_index.php');
-        exit;
-    }
-}
-
-// Conectar ao banco de dados
+// Conexão direta com o banco
 $db_host = 'mysql.annemacedo.com.br';
 $db_name = 'annemacedo02';
 $db_user = 'annemacedo02';
@@ -31,7 +19,18 @@ try {
         [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
     );
 } catch (PDOException $e) {
-    die("Erro na conexão com o banco de dados.");
+    die("Erro na conexão com o banco de dados: " . $e->getMessage());
+}
+
+// Verificar se já está logado
+if (isset($_SESSION['user_id'])) {
+    if (isset($_SESSION['user_type']) && $_SESSION['user_type'] === 'admin') {
+        header('Location: ' . $base_url . '/admin/index.php');
+        exit;
+    } else {
+        header('Location: ' . $base_url . '/index.php');
+        exit;
+    }
 }
 
 // Mensagem de erro inicialmente vazia
@@ -47,8 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         try {
             // Buscar usuário pelo email
-            $sql = "SELECT * FROM usuarios WHERE email = ? AND status = 'ativo'";
-            $stmt = $pdo->prepare($sql);
+            $stmt = $pdo->prepare("SELECT * FROM usuarios WHERE email = ? AND status = 'ativo'");
             $stmt->execute([$email]);
             $usuario = $stmt->fetch();
 
@@ -58,39 +56,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['user_name'] = $usuario['nome'];
                 $_SESSION['user_email'] = $usuario['email'];
                 $_SESSION['user_type'] = $usuario['tipo'];
-
-                // Verificar se o usuário tem um vendedor associado
-                $sql = "SELECT id FROM vendedores WHERE usuario_id = ?";
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute([$usuario['id']]);
-                $vendedor = $stmt->fetch();
-
-                // Se não tiver vendedor e for do tipo vendedor, criar um
-                if (!$vendedor && $usuario['tipo'] === 'vendedor') {
-                    try {
-                        $sql_insert = "INSERT INTO vendedores (usuario_id, nome_fantasia) VALUES (?, ?)";
-                        $stmt_insert = $pdo->prepare($sql_insert);
-                        $stmt_insert->execute([$usuario['id'], $usuario['nome']]);
-                    } catch (PDOException $e) {
-                        // Apenas log, não interromper o fluxo
-                        error_log("Erro ao criar vendedor: " . $e->getMessage());
+                
+                // Verificar se o usuário é vendedor e tem perfil configurado
+                if ($usuario['tipo'] === 'vendedor') {
+                    $stmt = $pdo->prepare("SELECT id FROM vendedores WHERE usuario_id = ?");
+                    $stmt->execute([$usuario['id']]);
+                    $vendedor = $stmt->fetch();
+                    
+                    if (!$vendedor) {
+                        // Criar vendedor automaticamente
+                        $stmt = $pdo->prepare("INSERT INTO vendedores (usuario_id, nome_fantasia) VALUES (?, ?)");
+                        try {
+                            $stmt->execute([$usuario['id'], $usuario['nome']]);
+                        } catch (PDOException $e) {
+                            // Apenas log, não interromper fluxo
+                        }
                     }
                 }
-
-                // Redirecionar com base no tipo de usuário
+                
+                // Redirecionar baseado no tipo
                 if ($usuario['tipo'] === 'admin') {
                     header('Location: ' . $base_url . '/admin/index.php');
                 } else {
-                    // Vendedor vai para a interface específica de vendedor
-                    header('Location: ' . $base_url . '/vendedor_index.php');
+                    header('Location: ' . $base_url . '/index.php');
                 }
                 exit;
             } else {
                 $erro = "Email ou senha inválidos ou usuário inativo.";
             }
         } catch (PDOException $e) {
-            $erro = "Erro ao processar login.";
-            error_log("Erro de login: " . $e->getMessage());
+            $erro = "Erro ao processar login: " . $e->getMessage();
         }
     }
 }
@@ -100,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - CalcMeli</title>
+    <title>Login Simples - CalcMeli</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <style>
         body {
@@ -131,24 +126,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             background-color: #e08a00;
             border-color: #e08a00;
         }
-        .btn-outline-primary {
-            color: #ff9a00;
-            border-color: #ff9a00;
-        }
-        .btn-outline-primary:hover {
-            background-color: #ff9a00;
-            border-color: #ff9a00;
-        }
-        .btn-warning {
-            background-color: #fff159;
-            border-color: #fff159;
-            color: #333;
-        }
-        .btn-warning:hover {
-            background-color: #e6d950;
-            border-color: #e6d950;
-            color: #333;
-        }
     </style>
 </head>
 <body>
@@ -156,19 +133,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="login-container">
             <div class="logo">
                 <h2>CalcMeli</h2>
-                <p>Sistema de Cálculo para Mercado Livre</p>
+                <p>Login Simples</p>
             </div>
             
             <?php if (!empty($erro)): ?>
                 <div class="alert alert-danger"><?php echo $erro; ?></div>
-            <?php endif; ?>
-            
-            <?php if (isset($_SESSION['success'])): ?>
-                <div class="alert alert-success"><?php echo $_SESSION['success']; unset($_SESSION['success']); ?></div>
-            <?php endif; ?>
-            
-            <?php if (isset($_SESSION['info'])): ?>
-                <div class="alert alert-info"><?php echo $_SESSION['info']; unset($_SESSION['info']); ?></div>
             <?php endif; ?>
             
             <form method="POST" action="">
@@ -186,25 +155,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </form>
             
             <div class="text-center mt-3">
-                <a href="forgot_password.php">Esqueceu a senha?</a>
-            </div>
-            
-            <hr class="my-4">
-            
-            <div class="text-center">
-                <p>Ainda não tem uma conta?</p>
-                <a href="register.php" class="btn btn-outline-primary">Cadastre-se</a>
-                
-                <?php if (file_exists('auth_mercadolivre.php')): ?>
-                <p class="mt-3">ou</p>
-                <a href="auth_mercadolivre.php" class="btn btn-warning">
-                    Entrar com Mercado Livre
-                </a>
-                <?php endif; ?>
+                <small>Este é um login simplificado para acesso emergencial</small>
             </div>
         </div>
     </div>
-    
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

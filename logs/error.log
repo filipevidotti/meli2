@@ -1,0 +1,5 @@
+[02-May-2025 09:24:05 America/Sao_Paulo] PHP Fatal error:  Uncaught PDOException: There is no active transaction in /home/annemacedo/www/novo2/criar_novas_tabelas.php:103
+Stack trace:
+#0 /home/annemacedo/www/novo2/criar_novas_tabelas.php(103): PDO->rollBack()
+#1 {main}
+  thrown in /home/annemacedo/www/novo2/criar_novas_tabelas.php on line 103

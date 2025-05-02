@@ -1,41 +1,30 @@
 <?php
-// Parâmetros de conexão
-$host = 'mysql.annemacedo.com.br';
-$dbname = 'annemacedo02';
-$username = 'annemacedo02'; 
-$password = 'Vingador13Anne'; 
+// Configurações do banco de dados
+$db_host = 'mysql.annemacedo.com.br';
+$db_name = 'annemacedo02';
+$db_user = 'annemacedo02';
+$db_pass = 'Vingador13Anne';
 
 try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    // Conectar usando PDO
+    $pdo = new PDO(
+        "mysql:host=$db_host;dbname=$db_name;charset=utf8mb4",
+        $db_user,
+        $db_pass,
+        [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES => false
+        ]
+    );
     
-    // Define a conexão como global para ser acessível em todos os arquivos
-    $GLOBALS["pdo"] = $pdo;
-} catch(PDOException $e) {
-    die("Erro de conexão com o banco de dados: " . $e->getMessage());
-}
-
-// Função para executar queries com segurança
-function executeQuery($sql, $params = []) {
-    global $pdo;
-    try {
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        return $stmt;
-    } catch(PDOException $e) {
-        die("Erro na execução da query: " . $e->getMessage());
-    }
-}
-
-// Função para buscar um único registro
-function fetchSingle($sql, $params = []) {
-    $stmt = executeQuery($sql, $params);
-    return $stmt->fetch(PDO::FETCH_ASSOC);
-}
-
-// Função para buscar múltiplos registros
-function fetchAll($sql, $params = []) {
-    $stmt = executeQuery($sql, $params);
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // Log de conexão bem-sucedida (opcional)
+    // error_log("Conexão com banco de dados estabelecida com sucesso.");
+} catch (PDOException $e) {
+    // Exibir mensagem de erro de forma segura
+    error_log("Erro na conexão com o banco de dados: " . $e->getMessage());
+    
+    // Mensagem genérica para usuário
+    die("Não foi possível estabelecer uma conexão com o banco de dados. Por favor, tente novamente mais tarde.");
 }
 ?>

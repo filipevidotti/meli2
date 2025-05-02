@@ -13,6 +13,81 @@ if (!isAdmin()) {
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Manipulador para alternar submenus
+    const submenus = document.querySelectorAll('.submenu-toggle');
+    
+    submenus.forEach(function(submenu) {
+        submenu.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Obter o elemento submenu relacionado
+            const parent = this.parentElement;
+            const submenuList = parent.querySelector('.sidebar-submenu');
+            const arrow = this.querySelector('.menu-arrow');
+            
+            // Alternar classes
+            submenuList.classList.toggle('open');
+            arrow.classList.toggle('rotated');
+            
+            // Se estiver fechando este submenu, também feche qualquer submenu aninhado
+            if (!submenuList.classList.contains('open')) {
+                const nestedOpenSubmenus = submenuList.querySelectorAll('.open');
+                const nestedRotatedArrows = submenuList.querySelectorAll('.rotated');
+                
+                nestedOpenSubmenus.forEach(function(nestedMenu) {
+                    nestedMenu.classList.remove('open');
+                });
+                
+                nestedRotatedArrows.forEach(function(nestedArrow) {
+                    nestedArrow.classList.remove('rotated');
+                });
+            }
+        });
+    });
+    
+    // Manipulador para alternar a visibilidade da sidebar em telas pequenas
+    const sidebarToggler = document.getElementById('sidebarToggler');
+    const sidebar = document.getElementById('sidebar');
+    
+    if (sidebarToggler) {
+        sidebarToggler.addEventListener('click', function() {
+            sidebar.classList.toggle('show');
+        });
+    }
+    
+    // Fechar sidebar quando clica fora em telas pequenas
+    document.addEventListener('click', function(event) {
+        if (
+            window.innerWidth <= 768 &&
+            sidebar.classList.contains('show') &&
+            !sidebar.contains(event.target) &&
+            event.target !== sidebarToggler
+        ) {
+            sidebar.classList.remove('show');
+        }
+    });
+});
+// Fechar outros submenus ao abrir um novo
+if (submenuList.classList.contains('open')) {
+    document.querySelectorAll('.sidebar-submenu.open').forEach(function(openMenu) {
+        if (openMenu !== submenuList) {
+            openMenu.classList.remove('open');
+            openMenu.previousElementSibling.querySelector('.menu-arrow').classList.remove('rotated');
+        }
+    });
+}
+// Salvar estado do menu
+if (submenuList.classList.contains('open')) {
+    localStorage.setItem('openMenu_' + submenuList.parentElement.id, 'open');
+} else {
+    localStorage.removeItem('openMenu_' + submenuList.parentElement.id);
+}
+
+
+</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo $page_title ?? 'Administração'; ?> - CalcMeli</title>
