@@ -1,0 +1,879 @@
+/*
+Theme Name: Imersão Clone
+Theme URI: https://example.com/imersao-clone-theme/  (Replace with actual URL if available)
+Author: Manus AI Agent
+Author URI: https://example.com/ (Replace with actual URL if available)
+Description: Um tema WordPress que replica o design da página de imersão de Max Cazonato, com opções de personalização.
+Version: 1.1.0
+License: GNU General Public License v2 or later
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
+Text Domain: imersao-clone
+Tags: one-column, custom-background, custom-logo, custom-menu, featured-images, theme-options, landing-page
+
+Este tema foi gerado com base no design de https://maxcazonato.com/imersao/
+*/
+
+/* Reset básico e estilos gerais */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: #000;
+    color: #fff;
+    font-family: 'Roboto', Arial, sans-serif; /* Considere adicionar Roboto via functions.php */
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden; /* Evitar scroll horizontal */
+}
+
+.container {
+    max-width: 1140px;
+    margin: 0 auto;
+    padding: 0 15px;
+    width: 100%;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    margin-bottom: 20px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #fff;
+}
+
+h1 {
+    font-size: 2.5rem; /* 40px */
+}
+
+h2 {
+    font-size: 2rem; /* 32px */
+    text-transform: uppercase;
+}
+
+a {
+    color: #FFF159;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+a:hover {
+    color: #FADF3A;
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+    display: block; /* Evitar espaço extra abaixo */
+}
+
+section {
+    padding: 60px 0; /* Espaçamento padrão para seções */
+    overflow: hidden; /* Contenção de floats e margens */
+}
+
+.highlight {
+    color: #FFF159;
+}
+
+.tag-red {
+    display: inline-block;
+    background-color: #ff0000;
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-weight: 700;
+    margin-bottom: 15px;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+}
+
+.btn {
+    display: inline-block;
+    padding: 15px 35px;
+    border-radius: 4px;
+    font-weight: 700;
+    text-transform: uppercase;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    font-size: 1.1rem; /* 18px */
+    text-align: center;
+    border: none;
+}
+
+.btn-primary {
+    background-color: #FFF159;
+    color: #000;
+    border: 2px solid #FFF159;
+    box-shadow: 0 0 15px rgba(255, 241, 89, 0.5);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-primary:hover {
+    background-color: #FADF3A;
+    border-color: #FADF3A;
+    box-shadow: 0 0 20px rgba(255, 241, 89, 0.7);
+    color: #000;
+}
+
+.btn-primary .arrow {
+    margin-left: 8px;
+    display: inline-block;
+    transition: transform 0.3s ease;
+}
+
+.btn-primary:hover .arrow {
+    transform: rotate(-45deg);
+}
+
+.security-icons {
+    display: flex;
+    justify-content: center;
+    gap: 25px;
+    margin-top: 25px;
+    flex-wrap: wrap;
+}
+
+.security-icon {
+    display: flex;
+    align-items: center;
+    font-size: 0.9rem; /* 14px */
+    color: #ccc;
+}
+
+.security-icon img {
+    margin-right: 8px;
+    width: 20px;
+    height: 20px;
+    filter: brightness(0.8);
+}
+
+/* Cabeçalho */
+.site-header {
+    padding: 15px 0;
+    background-color: #000;
+    border-bottom: 1px solid #222;
+    position: relative; /* Para z-index se necessário */
+    z-index: 100;
+}
+
+.site-branding {
+    display: flex;
+    align-items: center;
+}
+
+/* Estilos para o logo personalizado */
+.custom-logo-link {
+    display: inline-block;
+}
+.custom-logo {
+    max-height: 60px; /* Ajustar conforme necessário */
+    width: auto;
+}
+.site-title a {
+    color: #fff;
+    text-decoration: none;
+    font-size: 1.5rem;
+}
+.site-title a:hover {
+    color: #FFF159;
+}
+
+/* Seção Hero */
+.hero-section {
+    position: relative;
+    padding: 80px 0;
+    background-color: #000;
+    background-size: cover;
+    background-position: center;
+    display: flex;
+    align-items: center;
+}
+
+.hero-section .container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 40px;
+}
+
+.hero-content {
+    flex: 1;
+    max-width: 600px;
+    text-align: left;
+}
+
+.hero-content h1 {
+    font-size: 2.2rem; /* Ajustado */
+    margin-bottom: 20px;
+    text-transform: uppercase;
+}
+
+.hero-content p {
+    font-size: 1.1rem; /* 18px */
+    margin-bottom: 15px;
+    color: #eee;
+}
+
+.hero-content .btn {
+    margin-top: 15px;
+}
+
+.hero-image-area {
+    flex: 1;
+    max-width: 500px;
+    text-align: center;
+}
+
+.hero-person-image {
+    max-width: 100%;
+    height: auto;
+}
+
+/* Seção de Vídeo */
+.video-section {
+    text-align: center;
+}
+
+.video-section h2 {
+    margin-bottom: 40px;
+}
+
+.video-wrapper {
+    max-width: 800px;
+    margin: 0 auto 40px;
+    position: relative;
+    padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+    height: 0;
+    overflow: hidden;
+    border-radius: 8px; /* Adiciona bordas arredondadas */
+    background-color: #111; /* Fundo para placeholder */
+}
+
+.video-placeholder {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    color: #555;
+}
+
+.video-wrapper iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+/* Seção Validated Step */
+.validated-step-section {
+    background-color: #0a0a0a;
+}
+
+.validated-content {
+    display: flex;
+    align-items: center;
+    gap: 40px;
+}
+
+.validated-image {
+    flex: 1;
+    max-width: 450px;
+}
+
+.validated-text {
+    flex: 1;
+    max-width: 600px;
+}
+
+.validated-text h2 {
+    font-size: 1.8rem;
+    margin-bottom: 15px;
+}
+
+.validated-text p {
+    font-size: 1.1rem;
+    color: #ccc;
+}
+
+/* Seção de Tópicos/Cards */
+.topics-section {
+    text-align: center;
+}
+
+.topics-section h2 {
+    margin-bottom: 60px;
+}
+
+.topics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 30px;
+    margin-bottom: 60px;
+}
+
+.topic-card {
+    background-color: #111;
+    border-radius: 8px;
+    padding: 40px 25px 25px 25px; /* Espaço para o número */
+    text-align: left;
+    border: 1px solid #FFF159;
+    position: relative;
+    min-height: 180px;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.topic-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 255, 0, 0.2);
+}
+
+.topic-number {
+    position: absolute;
+    top: -20px;
+    left: 20px;
+    background-color: #FFF159;
+    color: #000;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 1.2rem;
+}
+
+.topic-card p {
+    font-size: 1rem; /* 16px */
+    color: #eee;
+}
+
+/* Seção de Avisos */
+.warning-section {
+    background-color: #0a0a0a;
+}
+
+.warning-content {
+    display: flex;
+    align-items: center;
+    gap: 40px;
+}
+
+.warning-text {
+    flex: 1;
+    max-width: 600px;
+}
+
+.warning-text h2 {
+    font-size: 1.8rem;
+    margin-bottom: 15px;
+}
+
+.warning-text p {
+    font-size: 1rem;
+    color: #ccc;
+    margin-bottom: 15px;
+}
+
+.warning-image {
+    flex: 1;
+    max-width: 450px;
+}
+
+/* Seção de Bônus */
+.bonus-section {
+    /* background-color: #000; */
+}
+
+.bonus-content-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 50px;
+}
+
+.bonus-text-cta {
+    flex: 1;
+    max-width: 500px;
+}
+
+.bonus-text-cta h2 {
+    margin-bottom: 15px;
+}
+
+.bonus-text-cta p {
+    margin-bottom: 25px;
+    color: #ccc;
+}
+
+.bonus-list {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 15px;
+}
+
+.bonus-item {
+    display: flex;
+    align-items: center;
+    background-color: #111;
+    border-radius: 8px;
+    padding: 15px 20px;
+    text-align: left;
+    border: 1px solid #222;
+    transition: border-color 0.3s ease;
+}
+
+.bonus-item:hover {
+    border-color: #FFF159;
+}
+
+.bonus-icon {
+    margin-right: 15px;
+    color: #FFF159;
+    font-size: 1.5rem;
+    width: 30px; /* Alinhamento */
+    text-align: center;
+}
+
+.bonus-text {
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.bonus-text small {
+    display: block;
+    font-size: 0.8rem;
+    color: #999;
+    font-weight: 400;
+}
+
+/* Seção de Depoimentos */
+.testimonials-section {
+    background-color: #0a0a0a;
+    text-align: center;
+}
+
+.testimonials-section h2 {
+    margin-bottom: 60px;
+}
+
+.testimonials-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px; /* Espaço menor entre colunas */
+    align-items: start; /* Alinha os cards no topo */
+}
+
+.testimonial-column {
+    display: flex;
+    flex-direction: column;
+    gap: 15px; /* Espaço entre cards na mesma coluna */
+}
+
+.testimonial-card {
+    border-radius: 8px;
+    padding: 15px;
+    text-align: left;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.testimonial-header {
+    display: flex;
+    align-items: baseline;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+
+.testimonial-name {
+    font-weight: 700;
+    margin-right: 5px;
+    font-size: 0.95rem;
+}
+
+.testimonial-time {
+    font-size: 0.8rem;
+    color: #aaa;
+    margin-left: auto;
+}
+
+/* Cores dos cards de depoimento (exemplo) */
+.testimonial-card.color-blue { background-color: #e0e7ff; color: #333; }
+.testimonial-card.color-orange { background-color: #fff3e0; color: #333; }
+.testimonial-card.color-yellow { background-color: #fffde7; color: #333; }
+.testimonial-card.color-pink { background-color: #fce4ec; color: #333; }
+.testimonial-card.color-green { background-color: #e8f5e9; color: #333; }
+.testimonial-card.color-light-green { background-color: #f1f8e9; color: #333; }
+.testimonial-card.color-purple { background-color: #f3e5f5; color: #333; }
+.testimonial-card.color-dark-blue { background-color: #e3f2fd; color: #333; }
+.testimonial-card.color-teal { background-color: #e0f2f1; color: #333; }
+.testimonial-card.color-red { background-color: #ffebee; color: #333; }
+
+/* Seção Countdown/Price */
+.countdown-price-section {
+    text-align: center;
+    background: #000 url('<?php echo esc_url(get_theme_mod("imersao_countdown_bg_image", get_template_directory_uri() . "/images/placeholder-bg-logo-fade.png")); ?>') no-repeat center center; /* Adicionado Customizer */
+    background-size: contain;
+}
+
+.countdown-box {
+    background-color: rgba(0, 0, 0, 0.8); /* Fundo semi-transparente */
+    border: 1px solid #FFF159;
+    border-radius: 10px;
+    padding: 40px;
+    max-width: 500px;
+    margin: 0 auto;
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+}
+
+.countdown-timer {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 30px;
+}
+
+.time-block {
+    background-color: #ff0000;
+    color: #fff;
+    padding: 10px;
+    border-radius: 5px;
+    min-width: 60px;
+}
+
+.time-value {
+    display: block;
+    font-size: 1.8rem;
+    font-weight: 700;
+}
+
+.time-label {
+    display: block;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+}
+
+.price-info {
+    margin-bottom: 30px;
+}
+
+.lote-label {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+
+.original-price {
+    font-size: 1rem;
+    color: #aaa;
+    margin-bottom: 5px;
+}
+
+.original-price del {
+    color: #ff4444;
+}
+
+.current-price {
+    font-size: 3rem;
+    font-weight: 700;
+    color: #FFF159;
+    margin-bottom: 20px;
+}
+
+/* Seção Who Is */
+.who-is-section {
+    background-color: #0a0a0a;
+}
+
+.who-is-content {
+    display: flex;
+    align-items: center;
+    gap: 50px;
+}
+
+.who-is-image {
+    flex: 0 0 350px; /* Largura fixa para imagem */
+    position: relative;
+    text-align: center;
+}
+
+.who-is-image img {
+    border-radius: 15px;
+    border: 3px solid #FFF159;
+    box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+}
+
+.image-label {
+    position: absolute;
+    bottom: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.7);
+    color: #FFF159;
+    padding: 5px 15px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.who-is-text {
+    flex: 1;
+}
+
+.who-is-text h2 {
+    margin-bottom: 15px;
+}
+
+.who-is-text p {
+    font-size: 1.1rem;
+    color: #ccc;
+}
+
+/* Seção FAQ */
+.faq-section {
+    text-align: center;
+}
+
+.faq-section h2 {
+    margin-bottom: 50px;
+    line-height: 1.1;
+}
+
+.faq-section h2 .highlight {
+    font-size: 3.5rem; /* FAQ maior */
+    display: block;
+    margin-bottom: -10px; /* Ajuste visual */
+}
+
+.faq-accordion {
+    max-width: 800px;
+    margin: 0 auto;
+    text-align: left;
+}
+
+.faq-item {
+    border-bottom: 1px solid #333;
+}
+
+.faq-item:last-child {
+    border-bottom: none;
+}
+
+.faq-question {
+    padding: 20px 0;
+    font-size: 1.1rem;
+    font-weight: 500;
+    cursor: pointer;
+    position: relative;
+    list-style: none; /* Remover marcador padrão */
+    color: #eee;
+    display: flex; /* Para alinhar ícone */
+    justify-content: space-between;
+    align-items: center;
+}
+
+.faq-question::-webkit-details-marker { display: none; } /* Chrome/Safari */
+.faq-question::marker { display: none; } /* Firefox */
+
+.faq-icon {
+    display: inline-block;
+    width: 15px;
+    height: 15px;
+    border-right: 2px solid #FFF159;
+    border-bottom: 2px solid #FFF159;
+    transform: rotate(45deg);
+    transition: transform 0.3s ease;
+    margin-left: 15px;
+}
+
+details[open] > summary .faq-icon {
+    transform: rotate(-135deg);
+}
+
+.faq-answer {
+    padding: 0 0 20px 0;
+    color: #ccc;
+    font-size: 1rem;
+}
+
+/* Rodapé */
+.site-footer {
+    padding: 30px 0;
+    background-color: #FFF159;
+    text-align: center;
+}
+
+.footer-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.footer-logo {
+    max-height: 40px;
+    width: auto;
+    filter: brightness(0); /* Deixa o logo preto */
+}
+
+.copyright {
+    font-size: 0.9rem;
+    color: #000;
+}
+
+/* Botão Flutuante WhatsApp */
+.whatsapp-float {
+    position: fixed;
+    bottom: 25px;
+    right: 25px;
+    z-index: 1000;
+}
+
+.whatsapp-float a {
+    display: block;
+    width: 60px;
+    height: 60px;
+    background-color: #25d366;
+    color: #fff;
+    border-radius: 50%;
+    text-align: center;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.whatsapp-float a:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
+}
+
+.whatsapp-float svg {
+    width: 30px;
+    height: 30px;
+}
+
+/* Classes Utilitárias WordPress */
+.alignleft {
+    float: left;
+    margin-right: 1.5em;
+    margin-bottom: 1.5em;
+}
+
+.alignright {
+    float: right;
+    margin-left: 1.5em;
+    margin-bottom: 1.5em;
+}
+
+.aligncenter {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    margin-bottom: 1.5em;
+}
+
+.wp-caption {
+    max-width: 100%;
+    margin-bottom: 1.5em;
+    background: #eee;
+    padding: 5px;
+}
+
+.wp-caption img[class*="wp-image-"] {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.wp-caption .wp-caption-text {
+    font-size: 0.9em;
+    line-height: 1.5;
+    text-align: center;
+    margin: 5px 0 0;
+    color: #333;
+}
+
+/* Responsividade */
+@media (max-width: 992px) {
+    h1 { font-size: 2.2rem; }
+    h2 { font-size: 1.8rem; }
+
+    .hero-section .container {
+        flex-direction: column;
+        text-align: center;
+    }
+    .hero-content { text-align: center; max-width: 100%; }
+    .hero-image-area { margin-top: 30px; max-width: 400px; }
+
+    .validated-content, .warning-content, .bonus-content-wrapper, .who-is-content {
+        flex-direction: column;
+        text-align: center;
+    }
+    .validated-image, .warning-image, .bonus-list, .who-is-image {
+        max-width: 450px;
+        margin: 0 auto 30px;
+    }
+    .validated-text, .warning-text, .bonus-text-cta, .who-is-text {
+        max-width: 100%;
+    }
+    .bonus-list { grid-template-columns: 1fr; }
+
+    .testimonials-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    h1 { font-size: 1.8rem; }
+    h2 { font-size: 1.5rem; }
+    section { padding: 40px 0; }
+
+    .btn {
+        padding: 12px 25px;
+        font-size: 1rem;
+    }
+
+    .topics-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .testimonials-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .countdown-timer { gap: 10px; }
+    .time-block { min-width: 50px; padding: 8px; }
+    .time-value { font-size: 1.5rem; }
+    .current-price { font-size: 2.5rem; }
+    .countdown-box { padding: 30px; }
+
+    .who-is-image { flex-basis: auto; max-width: 300px; }
+
+    .faq-question { font-size: 1rem; }
+}
+
+@media (max-width: 480px) {
+    .security-icons { gap: 15px; justify-content: space-around; }
+    .security-icon span { display: none; } /* Oculta texto em telas muito pequenas */
+
+    .countdown-timer { flex-wrap: wrap; }
+    .time-block { flex-basis: 45%; }
+
+    .whatsapp-float { bottom: 15px; right: 15px; }
+    .whatsapp-float a { width: 50px; height: 50px; }
+    .whatsapp-float svg { width: 25px; height: 25px; }
+}
+
