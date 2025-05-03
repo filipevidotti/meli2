@@ -30,13 +30,14 @@ function getMercadoLivreAuthUrl($ml_client_id, $ml_redirect_uri): string {
     // Calcula o code_challenge
     $challenge = base64UrlEncode(hash('sha256', $verifier, true));
     
-    // Parâmetros da URL com PKCE
+    // Parâmetros da URL com PKCE e scope para ordens
     $params = http_build_query([
         "response_type" => "code",
         "client_id" => $ml_client_id,
         "redirect_uri" => $ml_redirect_uri,
         "code_challenge" => $challenge,
-        "code_challenge_method" => "S256"
+        "code_challenge_method" => "S256",
+        "scope" => "read write" // Adicione escopos específicos se necessário
     ]);
     
     return "https://auth.mercadolivre.com.br/authorization?{$params}";

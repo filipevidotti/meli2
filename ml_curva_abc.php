@@ -12,7 +12,11 @@
 function analiseCurvaABC($produtos) {
     // Verificar se existem produtos
     if (empty($produtos)) {
-        return [];
+        return [
+            'produtos' => [],
+            'estatisticas' => [],
+            'valor_total_vendas' => 0
+        ];
     }
     
     // 1. Ordenar produtos por valor total (do maior para o menor)
@@ -52,7 +56,7 @@ function analiseCurvaABC($produtos) {
     }
     
     // 6. Calcular estatísticas para cada categoria
-    $estatisticas = calcularEstatisticasCurvaABC($produtos);
+    $estatisticas = calcularEstatisticasCurvaABC($produtos, $valor_total_vendas);
     
     return [
         'produtos' => $produtos,
@@ -65,30 +69,41 @@ function analiseCurvaABC($produtos) {
  * Calcula estatísticas das categorias A, B e C
  *
  * @param array $produtos Lista de produtos classificados
+ * @param float $valor_total_vendas Valor total de todas as vendas
  * @return array Estatísticas por categoria
  */
-function calcularEstatisticasCurvaABC($produtos) {
+function calcularEstatisticasCurvaABC($produtos, $valor_total_vendas) {
     $categorias = ['A', 'B', 'C'];
     $estatisticas = [];
     
+    // Total de produtos
+    $total_produtos = count($produtos);
+    
     foreach ($categorias as $categoria) {
+        // Filtrar produtos da categoria atual
         $produtos_categoria = array_filter($produtos, function($produto) use ($categoria) {
             return $produto['classificacao'] === $categoria;
         });
         
+        // Contagem de produtos
         $quantidade_produtos = count($produtos_categoria);
-        $valor_total_categoria = array_sum(array_column($produtos_categoria, 'valor_total'));
-        $percentual_quantidade = ($quantidade_produtos / count($produtos)) * 100;
         
-        // Calcular valor total de todas as vendas
-        $valor_total_vendas = array_sum(array_column($produtos, 'valor_total'));
-        $percentual_valor = ($valor_total_categoria / $valor_total_vendas) * 100;
+        // Calcular valor total da categoria
+        $valor_total_categoria = 0;
+        foreach ($produtos_categoria as $produto) {
+            $valor_total_categoria += $produto['valor_total'];
+        }
         
+        // Calcular percentuais usando variáveis escalares (não arrays)
+        $percentual_quantidade = ($total_produtos > 0) ? ($quantidade_produtos / $total_produtos) * 100 : 0;
+        $percentual_valor = ($valor_total_vendas > 0) ? ($valor_total_categoria / $valor_total_vendas) * 100 : 0;
+        
+        // Armazenar estatísticas com valores escalares
         $estatisticas[$categoria] = [
             'quantidade_produtos' => $quantidade_produtos,
             'valor_total' => $valor_total_categoria,
-            'percentual_quantidade' => $percentual_quantidade,
-            'percentual_valor' => $percentual_valor
+            'percentual_quantidade' => $percentual_quantidade,   // Número, não array
+            'percentual_valor' => $percentual_valor              // Número, não array
         ];
     }
     
