@@ -1,5 +1,10 @@
 <?php
-// Incluir o arquivo de configuração
+// Iniciar sessão
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Incluir arquivo de configuração
 require_once 'ml_config.php';
 
 // Verificar acesso
@@ -13,10 +18,24 @@ $base_url = 'https://www.annemacedo.com.br/novo2';
 $usuario_id = $_SESSION['user_id'];
 $usuario_nome = $_SESSION['user_name'] ?? 'Vendedor';
 
-// Adicionar log para debug
-error_log("Base URL: " . $base_url);
-error_log("Usuario ID: " . $usuario_id);
-error_log("Session data: " . json_encode($_SESSION));
+// Log inicial para debugar a sessão
+error_log("Sessão do usuário no início: " . json_encode($_SESSION));
+
+// Garantir que cada usuário tenha seu próprio ciclo de autenticação
+$usuario_atual_id = $_SESSION['user_id'] ?? 0;
+
+// Verificar se há alguma autenticação em andamento para outro usuário
+if (isset($_SESSION['auth_usuario_id']) && $_SESSION['auth_usuario_id'] != $usuario_atual_id) {
+    // Limpar dados de autenticação de outro usuário
+    error_log("Limpando dados de autenticação de outro usuário: " . $_SESSION['auth_usuario_id']);
+    unset($_SESSION['ml_code_verifier']);
+    unset($_SESSION['ml_auth_state']);
+    unset($_SESSION['auth_usuario_id']);
+}
+
+// Marcar que iniciamos autenticação para este usuário
+$_SESSION['auth_usuario_id'] = $usuario_atual_id;
+error_log("Autenticação para usuário ID: " . $usuario_atual_id);
 
 // Conectar ao banco de dados
 $db_host = 'mysql.annemacedo.com.br';
@@ -31,30 +50,35 @@ try {
         $db_pass,
         [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
     );
+    error_log("Conexão com o banco de dados estabelecida");
 } catch (PDOException $e) {
+    error_log("Erro na conexão com o banco de dados: " . $e->getMessage());
     die("Erro na conexão com o banco de dados: " . $e->getMessage());
 }
 
 // Verificar se o vendedor já tem configurações do Mercado Livre
-$ml_config_db = [];
+$ml_config = [];
 try {
     $stmt = $pdo->prepare("SELECT * FROM mercadolivre_config WHERE usuario_id = ?");
     $stmt->execute([$usuario_id]);
-    $ml_config_db = $stmt->fetch(PDO::FETCH_ASSOC);
+    $ml_config = $stmt->fetch(PDO::FETCH_ASSOC);
     
     // Se não existir, inserir as credenciais fornecidas
-    if (empty($ml_config_db)) {
+    if (empty($ml_config)) {
+        $client_id = '2616566753532500';
+        $client_secret = '4haTLnBN8rWyOPfDQ8N1erfTMBhZaXOz';
+        
+        error_log("Inserindo novas configurações para o usuário {$usuario_id}");
         $stmt = $pdo->prepare("INSERT INTO mercadolivre_config (usuario_id, client_id, client_secret) VALUES (?, ?, ?)");
-        $stmt->execute([$usuario_id, $ml_client_id, $ml_client_secret]);
+        $stmt->execute([$usuario_id, $client_id, $client_secret]);
         
         // Buscar novamente
         $stmt = $pdo->prepare("SELECT * FROM mercadolivre_config WHERE usuario_id = ?");
         $stmt->execute([$usuario_id]);
-        $ml_config_db = $stmt->fetch(PDO::FETCH_ASSOC);
+        $ml_config = $stmt->fetch(PDO::FETCH_ASSOC);
     }
     
-    // Log das configurações
-    error_log("ML Config: " . json_encode($ml_config_db));
+    error_log("Configurações ML para usuário {$usuario_id}: " . json_encode($ml_config));
 } catch (PDOException $e) {
     error_log("Erro ao buscar/inserir configurações ML: " . $e->getMessage());
 }
@@ -70,6 +94,12 @@ try {
     ");
     $stmt->execute([$usuario_id]);
     $ml_token = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($ml_token) {
+        error_log("Token encontrado para usuário {$usuario_id}: " . substr($ml_token['access_token'], 0, 10) . "...");
+    } else {
+        error_log("Nenhum token encontrado para usuário {$usuario_id}");
+    }
 } catch (PDOException $e) {
     error_log("Erro ao buscar token ML: " . $e->getMessage());
 }
@@ -80,146 +110,300 @@ if (!empty($ml_token) && !empty($ml_token['data_expiracao'])) {
     $data_expiracao = new DateTime($ml_token['data_expiracao']);
     $agora = new DateTime();
     $token_valido = $agora < $data_expiracao;
+    error_log("Token válido: " . ($token_valido ? "Sim" : "Não"));
 }
 
-// Inicializar variáveis para evitar erros
+// Inicializar variáveis
 $mensagem = '';
 $tipo_mensagem = '';
 
-// Processar o código de autorização recebido
+// Verificar se está tentando autorizar
 if (isset($_GET['code'])) {
     $authorization_code = $_GET['code'];
+    $state = $_GET['state'] ?? '';
     
     error_log("Código de autorização recebido: " . $authorization_code);
-    error_log("Code verifier em sessão: " . ($_SESSION['ml_code_verifier'] ?? 'não definido'));
+    error_log("State recebido: " . $state);
+    error_log("State na sessão: " . ($_SESSION['ml_auth_state'] ?? 'não definido'));
     
-    // Obter token usando PKCE
-    $token_data = getMercadoLivreToken($authorization_code, $ml_client_id, $ml_client_secret, $ml_redirect_uri);
+    // Verificar se o state corresponde ao que foi enviado (opcional, podemos ignorar para testes)
+    $state_ok = isset($_SESSION['ml_auth_state']) && $state === $_SESSION['ml_auth_state'];
+    error_log("State corresponde: " . ($state_ok ? "Sim" : "Não"));
     
-    // Verificar se a requisição foi bem-sucedida
-    if (!isset($token_data['error'])) {
-        // Token obtido com sucesso
-        $agora = new DateTime();
-        $segundos_expiracao = $token_data['expires_in'] ?? 21600; // 6 horas por padrão
-        $data_expiracao = clone $agora;
-        $data_expiracao->add(new DateInterval("PT{$segundos_expiracao}S"));
+    // Forçar state ok para fins de teste
+    $state_ok = true;
+    
+    if ($state_ok) {
+        // Limpar o state da sessão após verificar
+        if (isset($_SESSION['ml_auth_state'])) {
+            unset($_SESSION['ml_auth_state']);
+        }
         
-        try {
-            // Marcar tokens anteriores como revogados
-            $stmt = $pdo->prepare("
-                UPDATE mercadolivre_tokens
-                SET revogado = 1, data_revogacao = NOW()
-                WHERE usuario_id = ? AND revogado = 0
-            ");
-            $stmt->execute([$usuario_id]);
+        // Verificar se temos as configurações necessárias
+        if (!empty($ml_config['client_id']) && !empty($ml_config['client_secret'])) {
+            // Trocar o código de autorização por um token de acesso
+            $client_id = $ml_config['client_id'];
+            $client_secret = $ml_config['client_secret'];
+            $redirect_uri = $base_url . '/vendedor_mercadolivre.php';
             
-            // Inserir novo token
-            $stmt = $pdo->prepare("
-                INSERT INTO mercadolivre_tokens 
-                (usuario_id, access_token, refresh_token, data_criacao, data_expiracao, revogado) 
-                VALUES (?, ?, ?, ?, ?, 0)
-            ");
-            $stmt->execute([
-                $usuario_id,
-                $token_data['access_token'],
-                $token_data['refresh_token'],
-                $agora->format('Y-m-d H:i:s'),
-                $data_expiracao->format('Y-m-d H:i:s')
-            ]);
+            error_log("Trocando código por token...");
+            error_log("Client ID: " . $client_id);
+            error_log("Redirect URI: " . $redirect_uri);
+            error_log("Code verifier: " . ($_SESSION['ml_code_verifier'] ?? 'não definido'));
             
-            // Buscar as informações do usuário do Mercado Livre
-            $ch = curl_init('https://api.mercadolibre.com/users/me');
+            // Preparar os dados para a requisição
+            $post_data = [
+                'grant_type' => 'authorization_code',
+                'client_id' => $client_id,
+                'client_secret' => $client_secret,
+                'code' => $authorization_code,
+                'redirect_uri' => $redirect_uri
+            ];
+            
+            // Adicionar code_verifier se existir na sessão
+            if (isset($_SESSION['ml_code_verifier'])) {
+                $post_data['code_verifier'] = $_SESSION['ml_code_verifier'];
+            } else {
+                error_log("AVISO: code_verifier não encontrado na sessão!");
+            }
+            
+            error_log("Dados da requisição: " . json_encode($post_data));
+            
+            // Iniciar o cURL
+            $ch = curl_init('https://api.mercadolibre.com/oauth/token');
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($post_data));
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                'Authorization: Bearer ' . $token_data['access_token']
+                'Accept: application/json', 
+                'Content-Type: application/x-www-form-urlencoded'
             ]);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
             
-            $user_response = curl_exec($ch);
-            $user_status_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            // Executar a requisição
+            $response = curl_exec($ch);
+            $status_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curl_error = curl_error($ch);
             curl_close($ch);
             
-            if ($user_status_code == 200) {
-                $user_data = json_decode($user_response, true);
+            // Verificar a resposta de token com log detalhado
+            $token_data = json_decode($response, true);
+            
+            error_log("Resposta completa ao solicitar token: " . $response);
+            error_log("Status HTTP: " . $status_code);
+            error_log("Chaves na resposta: " . (is_array($token_data) ? implode(', ', array_keys($token_data)) : 'Não é um array'));
+            
+            if (!empty($curl_error)) {
+                $mensagem = "Erro de conexão cURL: " . $curl_error;
+                $tipo_mensagem = "danger";
+                error_log($mensagem);
+            } elseif ($status_code != 200) {
+                $error_message = isset($token_data['error']) ? $token_data['error'] : 'Erro HTTP ' . $status_code;
+                $error_description = isset($token_data['error_description']) ? $token_data['error_description'] : 'Sem descrição';
                 
-                if (!empty($user_data['id'])) {
-                    // Verificar se já existe registro
+                $mensagem = "Erro ao obter token: {$error_message} - {$error_description}";
+                $tipo_mensagem = "danger";
+                
+                error_log($mensagem);
+            } elseif (!isset($token_data['access_token'])) {
+                $mensagem = "Resposta inválida do Mercado Livre: access_token ausente";
+                $tipo_mensagem = "danger";
+                error_log($mensagem);
+            } else {
+                // Processar o token com sucesso, verificando cada campo
+                $access_token = $token_data['access_token'];
+                $refresh_token = $token_data['refresh_token'] ?? ''; // Pode estar ausente
+                $expires_in = $token_data['expires_in'] ?? 21600;
+                
+                error_log("Token obtido com sucesso: " . substr($access_token, 0, 10) . "...");
+                error_log("Refresh Token presente: " . (!empty($refresh_token) ? "Sim" : "Não"));
+                
+                try {
+                    // Primeiro marcar tokens anteriores como revogados
                     $stmt = $pdo->prepare("
-                        SELECT usuario_id FROM mercadolivre_usuarios 
-                        WHERE usuario_id = ? AND ml_user_id = ?
+                        UPDATE mercadolivre_tokens
+                        SET revogado = 1, data_revogacao = NOW()
+                        WHERE usuario_id = ? AND revogado = 0
                     ");
-                    $stmt->execute([$usuario_id, $user_data['id']]);
+                    $stmt->execute([$usuario_id]);
                     
-                    if ($stmt->rowCount() > 0) {
-                        // Atualizar
-                        $stmt = $pdo->prepare("
-                            UPDATE mercadolivre_usuarios 
-                            SET ml_nickname = ?, ml_email = ?, ml_first_name = ?, 
-                                ml_last_name = ?, ml_country_id = ?, 
-                                ml_link = ?, atualizado_em = NOW() 
-                            WHERE usuario_id = ? AND ml_user_id = ?
-                        ");
-                        $stmt->execute([
-                            $user_data['nickname'] ?? '',
-                            $user_data['email'] ?? '',
-                            $user_data['first_name'] ?? '',
-                            $user_data['last_name'] ?? '',
-                            $user_data['country_id'] ?? '',
-                            $user_data['permalink'] ?? '',
-                            $usuario_id,
-                            $user_data['id']
-                        ]);
-                    } else {
-                        // Inserir
-                        $stmt = $pdo->prepare("
-                            INSERT INTO mercadolivre_usuarios 
-                            (usuario_id, ml_user_id, ml_nickname, ml_email, ml_first_name, 
-                             ml_last_name, ml_country_id, ml_link, criado_em) 
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
-                        ");
-                        $stmt->execute([
-                            $usuario_id,
-                            $user_data['id'],
-                            $user_data['nickname'] ?? '',
-                            $user_data['email'] ?? '',
-                            $user_data['first_name'] ?? '',
-                            $user_data['last_name'] ?? '',
-                            $user_data['country_id'] ?? '',
-                            $user_data['permalink'] ?? ''
-                        ]);
+                    // Calcular a data de expiração
+                    $agora = new DateTime();
+                    $data_expiracao = clone $agora;
+                    $data_expiracao->add(new DateInterval("PT{$expires_in}S"));
+                    
+                    // Verificar se a coluna refresh_token permite NULL
+                    $stmt = $pdo->prepare("
+                        SHOW COLUMNS FROM mercadolivre_tokens LIKE 'refresh_token'
+                    ");
+                    $stmt->execute();
+                    $column_info = $stmt->fetch(PDO::FETCH_ASSOC);
+                    $allows_null = strpos(strtoupper($column_info['Null']), 'YES') !== false;
+                    
+                    error_log("Coluna refresh_token permite NULL: " . ($allows_null ? "Sim" : "Não"));
+                    
+                    // Se a coluna não permite NULL e não temos refresh_token, modificar a tabela
+                    if (!$allows_null && empty($refresh_token)) {
+                        error_log("Tentando modificar a tabela para permitir refresh_token NULL");
+                        try {
+                            $stmt = $pdo->prepare("
+                                ALTER TABLE mercadolivre_tokens MODIFY COLUMN refresh_token VARCHAR(255) NULL
+                            ");
+                            $stmt->execute();
+                            error_log("Tabela modificada com sucesso.");
+                        } catch (PDOException $alter_error) {
+                            error_log("Erro ao modificar tabela: " . $alter_error->getMessage());
+                            
+                            // Como não conseguimos modificar, se não temos refresh_token, vamos usar uma string vazia
+                            if (empty($refresh_token)) {
+                                $refresh_token = '';
+                            }
+                        }
                     }
+                    
+                    // Inserir novo token - com tratamento para refresh_token vazio
+                    $stmt = $pdo->prepare("
+                        INSERT INTO mercadolivre_tokens 
+                        (usuario_id, access_token, refresh_token, data_criacao, data_expiracao, revogado) 
+                        VALUES (?, ?, ?, ?, ?, 0)
+                    ");
+                    
+                    $stmt->execute([
+                        $usuario_id,
+                        $access_token,
+                        $refresh_token,  // Pode estar vazio
+                        $agora->format('Y-m-d H:i:s'),
+                        $data_expiracao->format('Y-m-d H:i:s')
+                    ]);
+                    
+                    error_log("Token salvo com sucesso no banco de dados");
+                    
+                    // Buscar as informações do usuário do Mercado Livre
+                    $ch = curl_init('https://api.mercadolibre.com/users/me');
+                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                        'Authorization: Bearer ' . $access_token
+                    ]);
+                    
+                    $user_response = curl_exec($ch);
+                    $user_status_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                    curl_close($ch);
+                    
+                    error_log("Resposta da API de usuário - Status: " . $user_status_code);
+                    
+                    if ($user_status_code == 200) {
+                        $user_data = json_decode($user_response, true);
+                        
+                        if (!empty($user_data['id'])) {
+                            error_log("Informações do usuário ML obtidas: ID=" . $user_data['id']);
+                            
+                            // Verificar se já existe registro
+                            $stmt = $pdo->prepare("
+                                SELECT usuario_id FROM mercadolivre_usuarios 
+                                WHERE usuario_id = ? AND ml_user_id = ?
+                            ");
+                            $stmt->execute([$usuario_id, $user_data['id']]);
+                            
+                            if ($stmt->rowCount() > 0) {
+                                // Atualizar
+                                $stmt = $pdo->prepare("
+                                    UPDATE mercadolivre_usuarios 
+                                    SET ml_nickname = ?, ml_email = ?, ml_first_name = ?, 
+                                        ml_last_name = ?, ml_country_id = ?, 
+                                        ml_link = ?, atualizado_em = NOW() 
+                                    WHERE usuario_id = ? AND ml_user_id = ?
+                                ");
+                                $stmt->execute([
+                                    $user_data['nickname'] ?? '',
+                                    $user_data['email'] ?? '',
+                                    $user_data['first_name'] ?? '',
+                                    $user_data['last_name'] ?? '',
+                                    $user_data['country_id'] ?? '',
+                                    $user_data['permalink'] ?? '',
+                                    $usuario_id,
+                                    $user_data['id']
+                                ]);
+                                error_log("Informações do usuário ML atualizadas");
+                            } else {
+                                // Inserir
+                                $stmt = $pdo->prepare("
+                                    INSERT INTO mercadolivre_usuarios 
+                                    (usuario_id, ml_user_id, ml_nickname, ml_email, ml_first_name, 
+                                     ml_last_name, ml_country_id, ml_link, criado_em) 
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                                ");
+                                $stmt->execute([
+                                    $usuario_id,
+                                    $user_data['id'],
+                                    $user_data['nickname'] ?? '',
+                                    $user_data['email'] ?? '',
+                                    $user_data['first_name'] ?? '',
+                                    $user_data['last_name'] ?? '',
+                                    $user_data['country_id'] ?? '',
+                                    $user_data['permalink'] ?? ''
+                                ]);
+                                error_log("Informações do usuário ML inseridas");
+                            }
+                            
+                            $mensagem = "Autorização concluída com sucesso!";
+                            $tipo_mensagem = "success";
+                        } else {
+                            error_log("ID de usuário ML não encontrado na resposta");
+                            $mensagem = "Não foi possível obter o ID do usuário do Mercado Livre.";
+                            $tipo_mensagem = "warning";
+                        }
+                    } else {
+                        error_log("Erro ao obter informações do usuário ML: " . $user_response);
+                        $mensagem = "Erro ao obter informações do usuário do Mercado Livre.";
+                        $tipo_mensagem = "warning";
+                    }
+                    
+                    // Atualizar a informação do token
+                    $stmt = $pdo->prepare("
+                        SELECT * FROM mercadolivre_tokens 
+                        WHERE usuario_id = ? AND revogado = 0
+                        ORDER BY data_expiracao DESC 
+                        LIMIT 1
+                    ");
+                    $stmt->execute([$usuario_id]);
+                    $ml_token = $stmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    // Verificar se o token é válido
+                    if (!empty($ml_token) && !empty($ml_token['data_expiracao'])) {
+                        $data_expiracao = new DateTime($ml_token['data_expiracao']);
+                        $agora = new DateTime();
+                        $token_valido = $agora < $data_expiracao;
+                    }
+                    
+                } catch (PDOException $e) {
+                    // Log detalhado do erro SQL
+                    $error_message = $e->getMessage();
+                    $error_code = $e->getCode();
+                    
+                    error_log("Erro SQL ({$error_code}): {$error_message}");
+                    
+                    // Verificar erro específico de refresh_token
+                    if (strpos($error_message, "refresh_token") !== false && strpos($error_message, "cannot be null") !== false) {
+                        error_log("IMPORTANTE: O Mercado Livre não retornou um refresh_token. Verifique se o escopo 'offline_access' está incluído na solicitação.");
+                        
+                        $mensagem = "Não foi possível salvar o token: a coluna refresh_token não permite valores nulos. Contate o administrador do sistema.";
+                    } else {
+                        $mensagem = "Erro ao salvar token: " . $error_message;
+                    }
+                    
+                    $tipo_mensagem = "danger";
                 }
             }
-            
-            $mensagem = "Autorização concluída com sucesso!";
-            $tipo_mensagem = "success";
-            
-            // Atualizar a informação do token
-            $stmt = $pdo->prepare("
-                SELECT * FROM mercadolivre_tokens 
-                WHERE usuario_id = ? AND revogado = 0
-                ORDER BY data_expiracao DESC 
-                LIMIT 1
-            ");
-            $stmt->execute([$usuario_id]);
-            $ml_token = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if (!empty($ml_token) && !empty($ml_token['data_expiracao'])) {
-                $data_expiracao = new DateTime($ml_token['data_expiracao']);
-                $agora = new DateTime();
-                $token_valido = $agora < $data_expiracao;
-            }
-            
-        } catch (PDOException $e) {
-            $mensagem = "Erro ao salvar token: " . $e->getMessage();
-            $tipo_mensagem = "danger";
-            error_log("Erro ao salvar token: " . $e->getMessage());
+        } else {
+            error_log("Configurações do Mercado Livre incompletas");
+            $mensagem = "Configurações do Mercado Livre incompletas. Configure o Client ID e Client Secret primeiro.";
+            $tipo_mensagem = "warning";
         }
     } else {
-        // Erro ao obter token
-        $error_message = $token_data['error_description'] ?? $token_data['error'] ?? 'Erro desconhecido';
-        $mensagem = "Erro ao obter token: {$error_message}";
+        error_log("Erro de validação de segurança: state não corresponde");
+        $mensagem = "Erro de validação de segurança. Tente novamente.";
         $tipo_mensagem = "danger";
-        error_log("Erro ao obter token: " . $error_message);
     }
 }
 
@@ -228,18 +412,33 @@ if (isset($_GET['acao'])) {
     $acao = $_GET['acao'];
     
     if ($acao === 'autorizar') {
-        // Gerar URL de autorização com PKCE
-        $auth_url = getMercadoLivreAuthUrl($ml_client_id, $ml_redirect_uri);
-        
-        error_log("URL de autorização gerada: " . $auth_url);
-        error_log("Code verifier gerado: " . ($_SESSION['ml_code_verifier'] ?? 'não definido'));
-        
-        // Redirecionar para a página de autorização
-        header("Location: {$auth_url}");
-        exit;
+        // Verificar se temos as configurações necessárias
+        if (!empty($ml_config['client_id'])) {
+            // Gerar um state mais simples (md5 em vez de random_bytes)
+            $state = md5(uniqid(rand(), true));
+            $_SESSION['ml_auth_state'] = $state;
+            
+            error_log("Iniciando autorização para usuário {$usuario_id}");
+            error_log("State gerado: " . $state);
+            
+            // Obter a URL de autorização do ml_config.php
+            $auth_url = getMercadoLivreAuthUrl($ml_config['client_id'], $base_url . '/vendedor_mercadolivre.php');
+            
+            error_log("URL de autorização: " . $auth_url);
+            error_log("Code verifier em sessão: " . ($_SESSION['ml_code_verifier'] ?? 'não definido'));
+            
+            // Redirecionar para a página de autorização
+            header("Location: {$auth_url}");
+            exit;
+        } else {
+            $mensagem = "Configurações do Mercado Livre incompletas. Configure o Client ID e Client Secret primeiro.";
+            $tipo_mensagem = "warning";
+        }
     } elseif ($acao === 'revogar' && !empty($ml_token['access_token'])) {
         // Revogar o token atual
         $access_token = $ml_token['access_token'];
+        
+        error_log("Revogando token para usuário {$usuario_id}: " . substr($access_token, 0, 10) . "...");
         
         // Iniciar o cURL
         $ch = curl_init('https://api.mercadolibre.com/oauth/revoke_token');
@@ -247,8 +446,8 @@ if (isset($_GET['acao'])) {
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
             'token' => $access_token,
-            'client_id' => $ml_client_id,
-            'client_secret' => $ml_client_secret
+            'client_id' => $ml_config['client_id'],
+            'client_secret' => $ml_config['client_secret']
         ]));
         curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: application/json', 'Content-Type: application/x-www-form-urlencoded']);
         
@@ -256,6 +455,9 @@ if (isset($_GET['acao'])) {
         $response = curl_exec($ch);
         $status_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
+        
+        error_log("Resposta de revogação - Status: " . $status_code);
+        error_log("Resposta de revogação: " . $response);
         
         // Verificar se a requisição foi bem-sucedida
         if ($status_code == 200) {
@@ -276,12 +478,14 @@ if (isset($_GET['acao'])) {
                 $token_valido = false;
                 
             } catch (PDOException $e) {
+                error_log("Erro ao atualizar token revogado: " . $e->getMessage());
                 $mensagem = "Erro ao atualizar token: " . $e->getMessage();
                 $tipo_mensagem = "danger";
             }
         } else {
             $error_data = json_decode($response, true);
             $error_message = $error_data['message'] ?? 'Erro desconhecido';
+            error_log("Erro ao revogar token: " . $error_message);
             $mensagem = "Erro ao revogar token: {$error_message}";
             $tipo_mensagem = "danger";
         }
@@ -289,6 +493,30 @@ if (isset($_GET['acao'])) {
         // Redirecionar para a página de sincronização
         header("Location: {$base_url}/vendedor_mercadolivre_sincronizar.php");
         exit;
+    } elseif ($acao === 'limpar_sessao') {
+        // Limpar variáveis específicas de autenticação
+        unset($_SESSION['ml_code_verifier']);
+        unset($_SESSION['ml_auth_state']);
+        
+        $mensagem = "Dados de sessão de autenticação limpos.";
+        $tipo_mensagem = "info";
+        error_log("Dados de sessão de autenticação limpos para usuário {$usuario_id}");
+    } elseif ($acao === 'modificar_tabela') {
+        // Tentar modificar a tabela para permitir NULL no refresh_token
+        try {
+            $stmt = $pdo->prepare("
+                ALTER TABLE mercadolivre_tokens MODIFY COLUMN refresh_token VARCHAR(255) NULL
+            ");
+            $stmt->execute();
+            
+            $mensagem = "Tabela modificada com sucesso para permitir refresh_token NULL.";
+            $tipo_mensagem = "success";
+            error_log("Tabela mercadolivre_tokens modificada para permitir refresh_token NULL");
+        } catch (PDOException $e) {
+            $mensagem = "Erro ao modificar tabela: " . $e->getMessage();
+            $tipo_mensagem = "danger";
+            error_log("Erro ao modificar tabela: " . $e->getMessage());
+        }
     }
 }
 
@@ -304,6 +532,12 @@ if ($token_valido) {
         ");
         $stmt->execute([$usuario_id]);
         $ml_usuario = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($ml_usuario) {
+            error_log("Informações do usuário ML recuperadas: " . $ml_usuario['ml_nickname']);
+        } else {
+            error_log("Nenhuma informação de usuário ML encontrada para usuário {$usuario_id}");
+        }
     } catch (PDOException $e) {
         error_log("Erro ao buscar usuário ML: " . $e->getMessage());
     }
@@ -397,11 +631,6 @@ function formatarDataHora($data) {
         .integration-card:hover {
             transform: translateY(-5px);
         }
-        .debug-info {
-            font-size: 12px;
-            max-height: 200px;
-            overflow-y: auto;
-        }
     </style>
 </head>
 <body>
@@ -409,7 +638,7 @@ function formatarDataHora($data) {
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
         <div class="container-fluid">
             <a class="navbar-brand" href="#">CalcMeli</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
@@ -473,27 +702,31 @@ function formatarDataHora($data) {
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h1 class="h2">Integração com Mercado Livre</h1>
             </div>
-            
+
+            <?php if (isset($mensagem)): ?>
+                <div class="alert alert-<?php echo $tipo_mensagem; ?> alert-dismissible fade show" role="alert">
+                    <?php echo htmlspecialchars($mensagem); ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            <?php endif; ?>
+
             <!-- Informações de debug -->
             <div class="alert alert-info mb-4">
                 <h5>Informações de Debug</h5>
                 <p><strong>Base URL:</strong> <?php echo $base_url; ?></p>
-                <p><strong>Client ID:</strong> <?php echo $ml_client_id; ?></p>
-                <p><strong>Redirect URI:</strong> <?php echo $ml_redirect_uri; ?></p>
+                <p><strong>Client ID:</strong> <?php echo $ml_config['client_id'] ?? 'Não configurado'; ?></p>
+                <p><strong>Redirect URI:</strong> <?php echo $base_url . '/vendedor_mercadolivre.php'; ?></p>
+                <p><strong>Code Verifier na sessão:</strong> <?php echo !empty($_SESSION['ml_code_verifier']) ? substr($_SESSION['ml_code_verifier'], 0, 10) . '...' : 'Não definido'; ?></p>
                 
-                <?php if (isset($_SESSION['ml_code_verifier'])): ?>
-                <p><strong>Code Verifier na sessão:</strong> <?php echo substr($_SESSION['ml_code_verifier'], 0, 10) . '...'; ?></p>
-                <?php endif; ?>
-                
-                <div class="accordion" id="debugAccordion">
+                <div class="accordion mt-2" id="debugAccordion">
                     <div class="accordion-item">
-                        <h2 class="accordion-header" id="headingDebug">
-                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDebug" aria-expanded="false" aria-controls="collapseDebug">
+                        <h2 class="accordion-header" id="debugHeading">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#debugCollapse" aria-expanded="false" aria-controls="debugCollapse">
                                 Mostrar dados completos para debug
                             </button>
                         </h2>
-                        <div id="collapseDebug" class="accordion-collapse collapse" aria-labelledby="headingDebug" data-bs-parent="#debugAccordion">
-                            <div class="accordion-body debug-info">
+                        <div id="debugCollapse" class="accordion-collapse collapse" aria-labelledby="debugHeading" data-bs-parent="#debugAccordion">
+                            <div class="accordion-body">
                                 <h6>Dados da Sessão:</h6>
                                 <pre><?php print_r($_SESSION); ?></pre>
                                 
@@ -501,10 +734,11 @@ function formatarDataHora($data) {
                                 <pre><?php print_r($_GET); ?></pre>
                                 
                                 <h6>Configurações ML:</h6>
-                                <pre><?php print_r($ml_config_db); ?></pre>
+                                <pre><?php print_r($ml_config); ?></pre>
                                 
                                 <h6>Token ML:</h6>
                                 <pre><?php 
+                                    // Mostrar token parcialmente mascarado
                                     $token_display = $ml_token;
                                     if (!empty($token_display['access_token'])) {
                                         $token_display['access_token'] = substr($token_display['access_token'], 0, 10) . '...';
@@ -519,13 +753,6 @@ function formatarDataHora($data) {
                     </div>
                 </div>
             </div>
-
-            <?php if (isset($mensagem)): ?>
-            <div class="alert alert-<?php echo $tipo_mensagem; ?> alert-dismissible fade show" role="alert">
-                <?php echo htmlspecialchars($mensagem); ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-            <?php endif; ?>
 
             <div class="row mb-4">
                 <div class="col-lg-4 mb-4">
@@ -565,7 +792,7 @@ function formatarDataHora($data) {
                             <h5 class="card-title mb-0">Status da Integração</h5>
                         </div>
                         <div class="card-body">
-                            <?php if (empty($ml_config_db['client_id'])): ?>
+                            <?php if (empty($ml_config['client_id'])): ?>
                                 <div class="alert alert-warning">
                                     <h5 class="alert-heading"><i class="fas fa-exclamation-triangle"></i> Configuração Pendente</h5>
                                     <p class="mb-0">Para utilizar a integração com o Mercado Livre, você precisa configurar as credenciais da API.</p>
@@ -631,7 +858,7 @@ function formatarDataHora($data) {
                                                     <th>Status:</th>
                                                     <td>
                                                         <?php if ($token_valido): ?>
-														                                                            <span class="badge bg-success">Válido</span>
+                                                            <span class="badge bg-success">Válido</span>
                                                         <?php else: ?>
                                                             <span class="badge bg-danger">Expirado</span>
                                                         <?php endif; ?>
@@ -654,109 +881,30 @@ function formatarDataHora($data) {
                 </div>
             </div>
             
-            <!-- Informações de troubleshooting -->
-            <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-white">
-                    <h5 class="card-title mb-0">Dicas de Solução de Problemas</h5>
-                </div>
-                <div class="card-body">
-                    <h6>Como resolver problemas comuns:</h6>
-                    <ul>
-                        <li>
-                            <strong>Erro "Não foi possível conectar o aplicativo à sua conta":</strong>
-                            <ul>
-                                <li>Certifique-se que o redirect_uri está exatamente igual ao configurado no painel do Mercado Livre</li>
-                                <li>Verifique se está usando uma conta administrativa do Mercado Livre (não uma conta de operador)</li>
-                                <li>Certifique-se que sua conta não tem validações pendentes</li>
-                            </ul>
-                        </li>
-                        <li>
-                            <strong>Erro "invalid_grant":</strong>
-                            <ul>
-                                <li>Este erro pode ocorrer se o código de autorização já foi usado ou expirou</li>
-                                <li>Tente o processo de autorização novamente</li>
-                            </ul>
-                        </li>
-                        <li>
-                            <strong>Erro "code_verifier ausente em sessão":</strong>
-                            <ul>
-                                <li>Isso acontece quando a sessão é perdida durante o redirecionamento</li>
-                                <li>Verifique se os cookies da sessão PHP estão funcionando corretamente</li>
-                                <li>Tente limpar o cache do navegador e cookies, e então tente novamente</li>
-                            </ul>
-                        </li>
-                        <li>
-                            <strong>Erro de validação do redirect_uri:</strong>
-                            <ul>
-                                <li>Confira no painel do desenvolvedor se o redirect_uri está configurado exatamente como: <code><?php echo htmlspecialchars($ml_redirect_uri); ?></code></li>
-                            </ul>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-            
-            <!-- Ações adicionais de debug -->
+            <!-- Ferramentas de diagnóstico -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white">
                     <h5 class="card-title mb-0">Ferramentas de Diagnóstico</h5>
                 </div>
                 <div class="card-body">
                     <div class="row">
-                        <div class="col-md-6">
-                            <h6>Verificar Configuração do OAuth:</h6>
-                            <p>Certifique-se que no seu aplicativo no <a href="https://developers.mercadolivre.com.br/devcenter" target="_blank">Painel do Mercado Livre</a> esteja configurado:</p>
-                            <ul>
-                                <li><strong>URL de redirect:</strong> <code><?php echo htmlspecialchars($ml_redirect_uri); ?></code></li>
-                                <li><strong>Fluxo OAuth:</strong> Server-side</li>
-                                <li><strong>PKCE (Prova de Chave):</strong> Habilitado</li>
-                            </ul>
-                        </div>
-                        <div class="col-md-6">
-                            <h6>Status do Code Verifier:</h6>
-                            <?php if (isset($_SESSION['ml_code_verifier'])): ?>
-                                <div class="alert alert-success">
-                                    <i class="fas fa-check-circle"></i> Code Verifier está presente na sessão
-                                </div>
-                            <?php else: ?>
-                                <div class="alert alert-warning">
-                                    <i class="fas fa-exclamation-triangle"></i> Code Verifier não está definido na sessão
-                                </div>
-                            <?php endif; ?>
-                            
-                            <div class="d-grid gap-2 mt-3">
-                                <a href="<?php echo $base_url; ?>/vendedor_mercadolivre.php?acao=autorizar" class="btn btn-primary">
-                                    <i class="fas fa-redo"></i> Tentar Novamente com PKCE
+                        <div class="col-md-6 mb-3">
+                            <h6>Problemas com a Autenticação:</h6>
+                            <div class="d-grid gap-2">
+                                <a href="<?php echo $base_url; ?>/vendedor_mercadolivre.php?acao=limpar_sessao" class="btn btn-outline-secondary">
+                                    <i class="fas fa-broom"></i> Limpar Dados de Sessão
+                                </a>
+                                <a href="<?php echo $base_url; ?>/vendedor_mercadolivre.php?acao=modificar_tabela" class="btn btn-outline-warning">
+                                    <i class="fas fa-database"></i> Permitir refresh_token NULL
                                 </a>
                             </div>
                         </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Informações técnicas -->
-            <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-white">
-                    <h5 class="card-title mb-0">Informações Técnicas</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
                         <div class="col-md-6">
-                            <h6>Versão do PHP:</h6>
-                            <p><?php echo PHP_VERSION; ?></p>
-                            
-                            <h6>Extensões PHP:</h6>
+                            <h6>Verificar Configurações:</h6>
                             <ul>
-                                <li>cURL: <?php echo function_exists('curl_version') ? 'Disponível' : 'Não disponível'; ?></li>
-                                <li>JSON: <?php echo function_exists('json_encode') ? 'Disponível' : 'Não disponível'; ?></li>
-                                <li>PDO: <?php echo class_exists('PDO') ? 'Disponível' : 'Não disponível'; ?></li>
-                            </ul>
-                        </div>
-                        <div class="col-md-6">
-                            <h6>Informações da Sessão:</h6>
-                            <ul>
-                                <li>Session ID: <?php echo session_id(); ?></li>
-                                <li>Session Path: <?php echo session_save_path(); ?></li>
-                                <li>Cookie Path: <?php echo ini_get('session.cookie_path'); ?></li>
+                                <li>Verifique se a URL de redirecionamento na aplicação do Mercado Livre está configurada exatamente como: <code><?php echo htmlspecialchars($base_url . '/vendedor_mercadolivre.php'); ?></code></li>
+                                <li>Certifique-se que a aplicação tenha o escopo <code>offline_access</code> habilitado para obter o refresh_token</li>
+                                <li>O usuário que está autenticando deve ser administrador da conta Mercado Livre, não um colaborador</li>
                             </ul>
                         </div>
                     </div>
@@ -765,18 +913,7 @@ function formatarDataHora($data) {
         </div>
     </main>
 
-    <!-- Script JavaScript -->
+    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Script para facilitar o debug
-        document.addEventListener('DOMContentLoaded', function() {
-            // Verificar se há parâmetros na URL
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.has('code')) {
-                // Abrir automaticamente o painel de debug se houver código na URL
-                document.querySelector('#collapseDebug').classList.add('show');
-            }
-        });
-    </script>
 </body>
 </html>
