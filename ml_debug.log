@@ -1,0 +1,12 @@
+// Adicione no início do arquivo PHP, logo após a tag de abertura <?php
+function custom_log($message) {
+    $log_file = __DIR__ . '/ml_debug.log';
+    $timestamp = date('Y-m-d H:i:s');
+    file_put_contents($log_file, "[$timestamp] $message\n", FILE_APPEND);
+}
+
+// Substitua todas as chamadas de error_log() por custom_log()
+// Por exemplo:
+// error_log("Resposta da API: " . $response);
+// Torna-se:
+// custom_log("Resposta da API: " . $response);
