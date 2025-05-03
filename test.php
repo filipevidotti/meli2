@@ -1,47 +1,48 @@
 <?php
-// Exibir todos os erros
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
-// Informações básicas
-echo "<h1>Teste de PHP</h1>";
-echo "<p>PHP Version: " . phpversion() . "</p>";
-
-// Testar conexão com o banco de dados
-$db_host = 'mysql.annemacedo.com.br';
-$db_name = 'annemacedo02';
-$db_user = 'annemacedo02';
-$db_pass = 'Vingador13Anne';
-
-try {
-    $pdo = new PDO(
-        "mysql:host=$db_host;dbname=$db_name;charset=utf8mb4",
-        $db_user,
-        $db_pass,
-        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-    );
-    echo "<p style='color:green'>Conexão com o banco de dados: OK</p>";
-} catch (PDOException $e) {
-    echo "<p style='color:red'>Erro de conexão com o banco de dados: " . $e->getMessage() . "</p>";
+// Verificar se init.php existe e pode ser lido
+if (file_exists('init.php')) {
+    $init_content = file_get_contents('init.php');
+    echo "<p>init.php existe e contém " . strlen($init_content) . " bytes.</p>";
+} else {
+    echo "<p>ERRO: init.php não encontrado.</p>";
 }
 
-// Exibir informações do servidor
-echo "<h2>Informações do Servidor</h2>";
-echo "<pre>";
-print_r($_SERVER);
-echo "</pre>";
-
-// Testar acesso a arquivos
-echo "<h2>Verificação de Arquivos</h2>";
-$files = ['init.php', 'login.php', 'index.php', 'config/conexao.php'];
-foreach ($files as $file) {
-    if (file_exists($file)) {
-        echo "<p style='color:green'>$file: Existe</p>";
-        echo "<p>Tamanho: " . filesize($file) . " bytes</p>";
-        echo "<p>Última modificação: " . date("F d Y H:i:s", filemtime($file)) . "</p>";
+// Verificar se o diretório functions existe
+if (is_dir('functions')) {
+    echo "<p>Diretório functions encontrado.</p>";
+} else {
+    echo "<p>ERRO: Diretório functions não encontrado.</p>";
+    // Tentar criar
+    if (mkdir('functions', 0755)) {
+        echo "<p>Diretório functions criado com sucesso.</p>";
     } else {
-        echo "<p style='color:red'>$file: Não existe</p>";
+        echo "<p>ERRO: Falha ao criar diretório functions.</p>";
     }
 }
+
+// Verificar se auth.php existe e pode ser lido
+if (file_exists('functions/auth.php')) {
+    $auth_content = file_get_contents('functions/auth.php');
+    echo "<p>functions/auth.php existe e contém " . strlen($auth_content) . " bytes.</p>";
+} else {
+    echo "<p>ERRO: functions/auth.php não encontrado.</p>";
+}
+
+// Testar inclusão de init.php (que por sua vez inclui auth.php)
+try {
+    require_once 'init.php';
+    echo "<p>init.php incluído com sucesso.</p>";
+    
+    // Verificar se a função protegerPagina está definida
+    if (function_exists('protegerPagina')) {
+        echo "<p>Função protegerPagina() está definida.</p>";
+    } else {
+        echo "<p>ERRO: Função protegerPagina() não está definida.</p>";
+    }
+} catch (Exception $e) {
+    echo "<p>ERRO ao incluir init.php: " . $e->getMessage() . "</p>";
+}
+
+echo "<p>Teste concluído!</p>";
+
 ?>

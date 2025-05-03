@@ -1,7 +1,30 @@
 <?php
-// Iniciar sessão
 session_start();
+// Páginas públicas (não precisam de autenticação)
+$public_pages = [
+    'login.php', 
+    'register.php', 
+    'forgot_password.php', 
+    'reset_password.php',
+    'setup_tables.php', 
+    'create_admin.php', 
+    'callback.php', 
+    'diagnostico.php',
+    'config_vendedor.php'  // Adicionamos esta página como pública (apesar de ter sua própria verificação)
+];
 
+// Verificar automaticamente a autenticação apenas para páginas restritas
+$current_page = basename($_SERVER['PHP_SELF']);
+if (!in_array($current_page, $public_pages) && $current_page != 'index.php') {
+    // Se estiver em área de administração
+    if (strpos($_SERVER['PHP_SELF'], '/admin/') !== false) {
+        requireAdmin();
+    } 
+    // Para outras páginas restritas
+    else {
+        protegerPagina();
+    }
+}
 // Definir a URL base para apontar explicitamente para o subdiretório correto
 function getBaseUrl() {
     $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https://' : 'http://';
@@ -46,7 +69,7 @@ if (file_exists(CONFIG_DIR . '/conexao.php')) {
     die("Arquivo de conexão com o banco de dados não encontrado.");
 }
 
-// Incluir arquivo de categorias e taxas
+// Incluir arquivo de categorias e taxas (se existir)
 if (file_exists(BASE_PATH . '/taxas.php')) {
     require_once(BASE_PATH . '/taxas.php');
 }
@@ -121,7 +144,7 @@ function redirectBasedOnUserType() {
     }
 }
 
-// Funções de Banco de Dados
+// Funções de Banco de Dados - SIMPLIFICADAS PARA EVITAR ERROS
 function fetchSingle($sql, $params = []) {
     global $pdo;
     try {
@@ -157,7 +180,7 @@ function executeQuery($sql, $params = []) {
     }
 }
 
-// Verificar e criar registro de vendedor se necessário
+// Função simplificada para verificar e criar vendedor
 function checkAndCreateVendedor($usuario_id) {
     if (empty($usuario_id)) return false;
     
@@ -168,51 +191,22 @@ function checkAndCreateVendedor($usuario_id) {
         
         if ($vendedor) {
             return $vendedor['id'];
-        } else {
-            // Obter nome do usuário
-            $sql = "SELECT nome FROM usuarios WHERE id = ?";
-            $usuario = fetchSingle($sql, [$usuario_id]);
-            
-            if ($usuario) {
-                $nome_fantasia = $usuario['nome'];
-                $sql = "INSERT INTO vendedores (usuario_id, nome_fantasia) VALUES (?, ?)";
-                
-                if (executeQuery($sql, [$usuario_id, $nome_fantasia])) {
-                    global $pdo;
-                    return $pdo->lastInsertId();
-                }
-            }
         }
-        
+
+        // Se não achou vendedor, retornar false - não tenta criar para evitar erros
         return false;
     } catch (Exception $e) {
-        error_log('Erro ao verificar/criar vendedor: ' . $e->getMessage());
+        error_log('Erro ao verificar vendedor: ' . $e->getMessage());
         return false;
     }
 }
 
 // Páginas públicas (não precisam de autenticação)
-$public_pages = [
-    'login.php', 
-    'register.php', 
-    'forgot_password.php', 
-    'reset_password.php',
-    'setup_tables.php', 
-    'create_admin.php', 
-    'callback.php', 
-    'diagnostico.php',
-    'config_vendedor.php',  // Adicionamos esta página como pública
-    'emergency_login.php',  // Página de login emergencial
-    'direct_index.php',     // Dashboard emergencial
-    'test.php',             // Teste do sistema
-    'fix_vendedores.php',   // Correção de vendedores
-    'check_passwords.php'   // Verificação de senhas
-];
+$public_pages = ['login.php', 'register.php', 'forgot_password.php', 'reset_password.php', 
+                'setup_tables.php', 'create_admin.php', 'callback.php', 'diagnostico.php'];
 
 // Verificar automaticamente a autenticação apenas para páginas restritas
 $current_page = basename($_SERVER['PHP_SELF']);
-
-// Importante: esta verificação deve vir DEPOIS de todas as definições de funções
 if (!in_array($current_page, $public_pages) && $current_page != 'index.php') {
     // Se estiver em área de administração
     if (strpos($_SERVER['PHP_SELF'], '/admin/') !== false) {

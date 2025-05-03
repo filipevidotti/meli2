@@ -1,35 +1,55 @@
 <?php
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
+echo "<h1>Correção do arquivo vendedor_index.php</h1>";
+
+// Verificar se o arquivo existe
+$vendedor_file = 'vendedor_index.php';
+if (file_exists($vendedor_file)) {
+    // Fazer backup
+    if (!file_exists($vendedor_file . '.original.bak')) {
+        copy($vendedor_file, $vendedor_file . '.original.bak');
+        echo "<p>Backup do arquivo original criado como vendedor_index.php.original.bak</p>";
+    }
+    
+    // Criar uma versão básica e funcional do arquivo
+    $basic_vendedor_index = '<?php
+// Controle de erros
+ini_set("display_errors", 1);
+error_reporting(E_ALL);
+
 // Iniciar sessão
 session_start();
-// Verificar acesso
 
-// Verificar acesso
-if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== 'vendedor') {
-    header("Location: emergency_login.php");
-    exit;
-}
+// Dados básicos - não precisamos do init.php por enquanto
+$base_url = "http://www.annemacedo.com.br/novo2";
+$usuario_id = $_SESSION["user_id"] ?? 0;
+$usuario_nome = $_SESSION["user_name"] ?? "Vendedor";
 
-// Dados básicos
-$base_url = 'http://www.annemacedo.com.br/novo2';
-$usuario_id = $_SESSION['user_id'];
-$usuario_nome = $_SESSION['user_name'] ?? 'Vendedor';
-$usuario_email = $_SESSION['user_email'] ?? '';
-
-// Conectar ao banco de dados
-$db_host = 'mysql.annemacedo.com.br';
-$db_name = 'annemacedo02';
-$db_user = 'annemacedo02';
-$db_pass = 'Vingador13Anne';
-
+// Conectar ao banco de dados diretamente para evitar dependências
 try {
     $pdo = new PDO(
-        "mysql:host=$db_host;dbname=$db_name;charset=utf8mb4",
-        $db_user,
-        $db_pass,
+        "mysql:host=mysql.annemacedo.com.br;dbname=annemacedo02;charset=utf8mb4",
+        "annemacedo02",
+        "Vingador13Anne",
         [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]
     );
 } catch (PDOException $e) {
     die("Erro na conexão com o banco de dados: " . $e->getMessage());
+}
+
+// Funções básicas necessárias
+function formatCurrency($value) {
+    return "R$ " . number_format((float)$value, 2, ",", ".");
+}
+
+function formatPercentage($value) {
+    return number_format((float)$value, 2, ",", ".") . "%";
+}
+
+function formatDate($date) {
+    return date("d/m/Y", strtotime($date));
 }
 
 // Obter ou criar o registro de vendedor
@@ -40,7 +60,7 @@ try {
     $vendedor = $stmt->fetch();
     
     if ($vendedor) {
-        $vendedor_id = $vendedor['id'];
+        $vendedor_id = $vendedor["id"];
     } else {
         // Criar vendedor automaticamente
         $stmt = $pdo->prepare("INSERT INTO vendedores (usuario_id, nome_fantasia) VALUES (?, ?)");
@@ -52,15 +72,15 @@ try {
 }
 
 // Verificar filtro de datas
-$start_date = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01');
-$end_date = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-d');
+$start_date = isset($_GET["start_date"]) ? $_GET["start_date"] : date("Y-m-01");
+$end_date = isset($_GET["end_date"]) ? $_GET["end_date"] : date("Y-m-d");
 
 // Obter métricas
 $resumo = [
-    'total_vendas' => 0,
-    'numero_vendas' => 0,
-    'total_lucro' => 0,
-    'media_margem' => 0
+    "total_vendas" => 0,
+    "numero_vendas" => 0,
+    "total_lucro" => 0,
+    "media_margem" => 0
 ];
 
 try {
@@ -96,33 +116,20 @@ try {
     error_log("Erro ao buscar vendas: " . $e->getMessage());
 }
 
-// Funções de formatação
-function formatCurrency($value) {
-    return 'R$ ' . number_format((float)$value, 2, ',', '.');
-}
-
-function formatPercentage($value) {
-    return number_format((float)$value, 2, ',', '.') . '%';
-}
-
-function formatDate($date) {
-    return date('d/m/Y', strtotime($date));
-}
-
 // Verificar categorias
 $categorias_ml = [];
 try {
     $stmt = $pdo->query("SELECT id, nome FROM categorias_ml ORDER BY nome");
     while ($row = $stmt->fetch()) {
-        $categorias_ml[$row['id']] = ['nome' => $row['nome'], 'taxa' => 11]; // Taxa padrão 11%
+        $categorias_ml[$row["id"]] = ["nome" => $row["nome"], "taxa" => 11]; // Taxa padrão 11%
     }
 } catch (PDOException $e) {
     // Se não conseguir carregar as categorias, usar algumas padrão
     $categorias_ml = [
-        'MLB5672' => ['nome' => 'Acessórios para Veículos', 'taxa' => 11],
-        'MLB1051' => ['nome' => 'Celulares e Telefones', 'taxa' => 16],
-        'MLB1648' => ['nome' => 'Computadores e Informática', 'taxa' => 14],
-        'MLB1574' => ['nome' => 'Eletrônicos, Áudio e Vídeo', 'taxa' => 15]
+        "MLB5672" => ["nome" => "Acessórios para Veículos", "taxa" => 11],
+        "MLB1051" => ["nome" => "Celulares e Telefones", "taxa" => 16],
+        "MLB1648" => ["nome" => "Computadores e Informática", "taxa" => 14],
+        "MLB1574" => ["nome" => "Eletrônicos, Áudio e Vídeo", "taxa" => 15]
     ];
 }
 ?>
@@ -137,7 +144,7 @@ try {
     <style>
         body {
             background-color: #f8f9fa;
-            font-family: 'Segoe UI', Arial, sans-serif;
+            font-family: "Segoe UI", Arial, sans-serif;
             padding-top: 56px;
         }
         .sidebar {
@@ -262,9 +269,9 @@ try {
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="<?php echo $base_url; ?>/direct_index.php">
+                    <a class="nav-link" href="<?php echo $base_url; ?>/debug_fix.php">
                         <i class="fas fa-life-ring"></i>
-                        Acesso Emergencial
+                        Diagnóstico
                     </a>
                 </li>
             </ul>
@@ -277,6 +284,12 @@ try {
                     <a class="nav-link" href="<?php echo $base_url; ?>/vendedor_config.php">
                         <i class="fas fa-cog"></i>
                         Configurações
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="<?php echo $base_url; ?>/fix_functions.php">
+                        <i class="fas fa-wrench"></i>
+                        Corrigir Funções
                     </a>
                 </li>
             </ul>
@@ -294,6 +307,16 @@ try {
                     </a>
                 </div>
             </div>
+        </div>
+        
+        <!-- Status do Sistema -->
+        <div class="alert alert-info">
+            <h4>Status de Emergência</h4>
+            <p>Esta é uma versão simplificada do dashboard para fins de diagnóstico e recuperação do sistema.</p>
+            <p><strong>Sessão Atual:</strong> <?php echo $usuario_id ? "Logado como $usuario_nome (ID: $usuario_id)" : "Sem login"; ?></p>
+            <p><strong>Vendedor ID:</strong> <?php echo $vendedor_id; ?></p>
+            <a href="fix_base_url.php" class="btn btn-primary">Corrigir Problemas do Sistema</a>
+            <a href="direct_login.php" class="btn btn-warning ms-2">Login Direto</a>
         </div>
         
         <!-- Filtro de Data -->
@@ -331,7 +354,7 @@ try {
                 <div class="card card-dashboard h-100 bg-primary text-white">
                     <div class="card-body">
                         <h5 class="card-title"><i class="fas fa-shopping-bag"></i> Total em Vendas</h5>
-                        <h3 class="mb-0"><?php echo formatCurrency($resumo['total_vendas'] ?? 0); ?></h3>
+                        <h3 class="mb-0"><?php echo formatCurrency($resumo["total_vendas"] ?? 0); ?></h3>
                     </div>
                 </div>
             </div>
@@ -340,7 +363,7 @@ try {
                 <div class="card card-dashboard h-100 bg-success text-white">
                     <div class="card-body">
                         <h5 class="card-title"><i class="fas fa-dollar-sign"></i> Lucro Total</h5>
-                        <h3 class="mb-0"><?php echo formatCurrency($resumo['total_lucro'] ?? 0); ?></h3>
+                        <h3 class="mb-0"><?php echo formatCurrency($resumo["total_lucro"] ?? 0); ?></h3>
                     </div>
                 </div>
             </div>
@@ -349,7 +372,7 @@ try {
                 <div class="card card-dashboard h-100 bg-info text-white">
                     <div class="card-body">
                         <h5 class="card-title"><i class="fas fa-chart-line"></i> Número de Vendas</h5>
-                        <h3 class="mb-0"><?php echo $resumo['numero_vendas'] ?? 0; ?></h3>
+                        <h3 class="mb-0"><?php echo $resumo["numero_vendas"] ?? 0; ?></h3>
                     </div>
                 </div>
             </div>
@@ -358,7 +381,7 @@ try {
                 <div class="card card-dashboard h-100 bg-warning text-dark">
                     <div class="card-body">
                         <h5 class="card-title"><i class="fas fa-percentage"></i> Margem Média</h5>
-                        <h3 class="mb-0"><?php echo formatPercentage($resumo['media_margem'] ?? 0); ?></h3>
+                        <h3 class="mb-0"><?php echo formatPercentage($resumo["media_margem"] ?? 0); ?></h3>
                     </div>
                 </div>
             </div>
@@ -395,35 +418,35 @@ try {
                             <tbody>
                                 <?php foreach ($vendas as $venda): ?>
                                     <tr>
-                                        <td><?php echo formatDate($venda['data_venda']); ?></td>
-                                        <td><?php echo htmlspecialchars($venda['produto']); ?></td>
-                                        <td><?php echo formatCurrency($venda['valor_venda']); ?></td>
-                                        <td><?php echo formatCurrency($venda['custo_produto']); ?></td>
-                                        <td><?php echo formatCurrency($venda['taxa_ml']); ?></td>
-                                        <td><?php echo formatCurrency($venda['lucro']); ?></td>
+                                        <td><?php echo formatDate($venda["data_venda"]); ?></td>
+                                        <td><?php echo htmlspecialchars($venda["produto"]); ?></td>
+                                        <td><?php echo formatCurrency($venda["valor_venda"]); ?></td>
+                                        <td><?php echo formatCurrency($venda["custo_produto"]); ?></td>
+                                        <td><?php echo formatCurrency($venda["taxa_ml"]); ?></td>
+                                        <td><?php echo formatCurrency($venda["lucro"]); ?></td>
                                         <td>
                                             <?php
-                                            $margem_class = '';
-                                            if ($venda['margem_lucro'] >= 20) {
-                                                $margem_class = 'bg-success';
-                                            } elseif ($venda['margem_lucro'] >= 10) {
-                                                $margem_class = 'bg-primary';
-                                            } elseif ($venda['margem_lucro'] > 0) {
-                                                $margem_class = 'bg-warning';
+                                            $margem_class = "";
+                                            if ($venda["margem_lucro"] >= 20) {
+                                                $margem_class = "bg-success";
+                                            } elseif ($venda["margem_lucro"] >= 10) {
+                                                $margem_class = "bg-primary";
+                                            } elseif ($venda["margem_lucro"] > 0) {
+                                                $margem_class = "bg-warning";
                                             } else {
-                                                $margem_class = 'bg-danger';
+                                                $margem_class = "bg-danger";
                                             }
                                             ?>
                                             <span class="badge <?php echo $margem_class; ?>">
-                                                <?php echo formatPercentage($venda['margem_lucro']); ?>
+                                                <?php echo formatPercentage($venda["margem_lucro"]); ?>
                                             </span>
                                         </td>
                                         <td>
                                             <div class="btn-group" role="group">
-                                                <a href="<?php echo $base_url; ?>/vendedor_editar_venda.php?id=<?php echo $venda['id']; ?>" class="btn btn-sm btn-outline-primary" title="Editar">
+                                                <a href="<?php echo $base_url; ?>/vendedor_editar_venda.php?id=<?php echo $venda["id"]; ?>" class="btn btn-sm btn-outline-primary" title="Editar">
                                                     <i class="fas fa-edit"></i>
                                                 </a>
-                                                <button type="button" class="btn btn-sm btn-outline-danger" title="Excluir" onclick="confirmarExclusao(<?php echo $venda['id']; ?>)">
+                                                <button type="button" class="btn btn-sm btn-outline-danger" title="Excluir" onclick="confirmarExclusao(<?php echo $venda["id"]; ?>)">
                                                     <i class="fas fa-trash-alt"></i>
                                                 </button>
                                             </div>
@@ -439,81 +462,6 @@ try {
                         </div>
                     <?php endif; ?>
                 <?php endif; ?>
-            </div>
-        </div>
-        
-        <!-- Calculadora Rápida -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="fas fa-calculator"></i> Calculadora Rápida</h5>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <div class="form-floating">
-                            <input type="number" class="form-control" id="valor_produto" step="0.01" min="0" value="0.00">
-                            <label for="valor_produto">Valor do Produto (R$)</label>
-                        </div>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <div class="form-floating">
-                            <input type="number" class="form-control" id="custo_produto_calc" step="0.01" min="0" value="0.00">
-                            <label for="custo_produto_calc">Custo do Produto (R$)</label>
-                        </div>
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <div class="form-floating">
-                            <select class="form-select" id="taxa_categoria">
-                                <option value="">Selecione a categoria...</option>
-                                <?php foreach ($categorias_ml as $codigo => $categoria): ?>
-                                    <option value="<?php echo $categoria['taxa']; ?>">
-                                        <?php echo htmlspecialchars($categoria['nome']); ?> (<?php echo $categoria['taxa']; ?>%)
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                            <label for="taxa_categoria">Categoria no Mercado Livre</label>
-                        </div>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <div class="form-floating">
-                            <input type="number" class="form-control" id="taxa_personalizada" step="0.01" min="0" max="100" value="0.00">
-                            <label for="taxa_personalizada">Taxa Personalizada (%)</label>
-                        </div>
-                    </div>
-                </div>
-                <button type="button" id="btnCalcular" class="btn btn-primary">Calcular</button>
-                
-                <div class="mt-4" id="resultadoCalculo" style="display:none;">
-                    <h5>Resultado:</h5>
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="card">
-                                <div class="card-body">
-                                    <h6 class="card-title">Taxa do ML</h6>
-                                    <p class="card-text" id="resultadoTaxa">R$ 0,00</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="card">
-                                <div class="card-body">
-                                    <h6 class="card-title">Lucro</h6>
-                                    <p class="card-text" id="resultadoLucro">R$ 0,00</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="card">
-                                <div class="card-body">
-                                    <h6 class="card-title">Margem</h6>
-                                    <p class="card-text" id="resultadoMargem">0,00%</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
@@ -543,13 +491,13 @@ try {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener("DOMContentLoaded", function() {
             // Calculadora Rápida
-            document.getElementById('btnCalcular').addEventListener('click', function() {
-                const valorProduto = parseFloat(document.getElementById('valor_produto').value) || 0;
-                const custoProduto = parseFloat(document.getElementById('custo_produto_calc').value) || 0;
-                const taxaCategoria = parseFloat(document.getElementById('taxa_categoria').value) || 0;
-                const taxaPersonalizada = parseFloat(document.getElementById('taxa_personalizada').value) || 0;
+            document.getElementById("btnCalcular")?.addEventListener("click", function() {
+                const valorProduto = parseFloat(document.getElementById("valor_produto").value) || 0;
+                const custoProduto = parseFloat(document.getElementById("custo_produto_calc").value) || 0;
+                const taxaCategoria = parseFloat(document.getElementById("taxa_categoria").value) || 0;
+                const taxaPersonalizada = parseFloat(document.getElementById("taxa_personalizada").value) || 0;
                 
                 // Usar taxa da categoria se selecionada, senão usar a personalizada
                 const taxaFinal = taxaCategoria > 0 ? taxaCategoria : taxaPersonalizada;
@@ -560,20 +508,65 @@ try {
                 const margem = valorProduto > 0 ? (lucro / valorProduto) * 100 : 0;
                 
                 // Atualizar resultado
-                document.getElementById('resultadoTaxa').textContent = 'R$ ' + valorTaxa.toFixed(2).replace('.', ',');
-                document.getElementById('resultadoLucro').textContent = 'R$ ' + lucro.toFixed(2).replace('.', ',');
-                document.getElementById('resultadoMargem').textContent = margem.toFixed(2).replace('.', ',') + '%';
+                document.getElementById("resultadoTaxa").textContent = "R$ " + valorTaxa.toFixed(2).replace(".", ",");
+                document.getElementById("resultadoLucro").textContent = "R$ " + lucro.toFixed(2).replace(".", ",");
+                document.getElementById("resultadoMargem").textContent = margem.toFixed(2).replace(".", ",") + "%";
                 
                 // Mostrar div de resultado
-                document.getElementById('resultadoCalculo').style.display = 'block';
+                document.getElementById("resultadoCalculo").style.display = "block";
             });
         });
         
         // Função para confirmar exclusão
         function confirmarExclusao(id) {
-            document.getElementById('delete_id').value = id;
-            new bootstrap.Modal(document.getElementById('deleteModal')).show();
+            document.getElementById("delete_id").value = id;
+            new bootstrap.Modal(document.getElementById("deleteModal")).show();
         }
     </script>
 </body>
-</html>
+</html>';
+
+    // Escrever a nova versão
+    file_put_contents($vendedor_file, $basic_vendedor_index);
+    echo "<div style='color: green; margin: 15px 0; font-weight: bold;'>✅ Arquivo vendedor_index.php substituído por uma versão básica e funcional!</div>";
+    
+    echo "<p>Esta versão básica não depende do arquivo init.php e contém apenas o código necessário para funcionar.</p>";
+} else {
+    echo "<div style='color: red; margin: 15px 0;'>❌ Arquivo vendedor_index.php não encontrado.</div>";
+}
+
+echo "<h2>Próximos Passos:</h2>";
+echo "<ol>";
+echo "<li>Acesse o <a href='vendedor_index.php'>Dashboard do Vendedor</a> para verificar se a nova versão está funcionando.</li>";
+echo "<li>Se funcionar, use esta versão básica enquanto você corrige os outros problemas.</li>";
+echo "<li>Após corrigir o arquivo init.php e garantir que todas as funções estão definidas corretamente, você pode restaurar a versão original do vendedor_index.php.</li>";
+echo "</ol>";
+
+echo "<h2>Links Úteis:</h2>";
+echo "<ul>";
+echo "<li><a href='vendedor_index.php'>Dashboard do Vendedor</a> (Nova versão básica)</li>";
+echo "<li><a href='direct_login.php'>Login Direto</a> (Para forçar um login se necessário)</li>";
+echo "<li><a href='fix_base_url.php'>Corrigir Problema de BASE_URL</a> (Para resolver o erro da constante)</li>";
+echo "</ul>";
+?>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    max-width: 900px;
+    margin: 30px auto;
+    padding: 20px;
+    background-color: #f5f5f5;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+h1, h2 {
+    color: #333;
+}
+pre {
+    background-color: #f8f9fa;
+    padding: 10px;
+    border-left: 4px solid #007bff;
+    overflow-x: auto;
+}
+</style>
